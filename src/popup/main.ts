@@ -211,6 +211,7 @@ function makeRow(label: string, chipText: string, count?: number): HTMLElement {
 function card(opts: {
   name: string
   mono?: string
+  monoUrl?: string
   catText?: string
   requests?: number
   subs?: string[]
@@ -220,7 +221,13 @@ function card(opts: {
   d.className = 'card'
   const s = document.createElement('summary')
   const head = el('div', 'chead')
-  if (opts.mono !== undefined) head.append(monogram('mono', opts.mono || opts.name))
+  if (opts.monoUrl) {
+    const img = document.createElement('img')
+    img.className = 'mono mono-img'
+    img.src = opts.monoUrl
+    img.alt = ''
+    head.append(img)
+  } else if (opts.mono !== undefined) head.append(monogram('mono', opts.mono || opts.name))
   head.append(el('span', 'cname', opts.name))
   if (opts.catText) head.append(el('span', 'ccat', opts.catText))
   if (opts.requests !== undefined)
@@ -516,7 +523,11 @@ if (restricted) {
   if (siteSubs.length || own.length) {
     list.append(
       card({
-        name: `${siteName} · this site`,
+        name: siteName,
+        catText: 'this site',
+        monoUrl: /^https?:/.test(tabUrl)
+          ? chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(tabUrl)}&size=32`)
+          : undefined,
         mono: siteName,
         requests: ownTotal || undefined,
         subs: siteSubs,
