@@ -9,7 +9,9 @@
         --ink: #1b1e22;
         --muted: #6b7280;
         --hair: #ebebeb;
+        --chipbg: #f3f4f6;
         --track: #c03535;
+        --bad: #cf4141; --warn: #d99114; --ok: #2e8f57;
         --g-a: #2e8f57; --g-b: #6fa33c; --g-c: #d99114; --g-d: #d96a2e; --g-f: #cf4141;
       }
       @media (prefers-color-scheme: dark) {
@@ -18,17 +20,19 @@
           --ink: #ececec;
           --muted: #9aa0a6;
           --hair: #34373c;
+          --chipbg: #2b2e33;
           --track: #f27d7d;
+          --bad: #ef7070; --warn: #e8b04a; --ok: #57c288;
           --g-a: #57c288; --g-b: #9cc45e; --g-c: #e8b04a; --g-d: #eb8a54; --g-f: #ef7070;
         }
       }
       * { box-sizing: border-box; }
       body {
-        font: 13px/1.45 system-ui, sans-serif;
+        font: 13px/1.5 system-ui, sans-serif;
         background: var(--bg); color: var(--ink);
         width: 360px; margin: 0;
       }
-      header { display: flex; gap: 12px; align-items: center; padding: 14px 16px 10px; }
+      header { display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px; }
       .seal {
         width: 46px; height: 46px; flex-shrink: 0;
         border-radius: 10px; border: 1.5px solid currentColor;
@@ -41,13 +45,41 @@
       .head-text { min-width: 0; }
       .site { font-weight: 650; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .sub { color: var(--muted); font-size: 12px; }
-      .why { padding: 0 16px 12px; }
-      .list { max-height: 430px; overflow-y: auto; }
+      .verdict { padding: 2px 16px 10px; }
+      .who { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+      .who:empty { display: none; }
+      .pill {
+        display: flex; align-items: center; gap: 6px;
+        background: var(--chipbg); border-radius: 99px;
+        padding: 3px 10px 3px 4px; font-size: 12px; font-weight: 550;
+      }
+      .mono {
+        width: 20px; height: 20px; border-radius: 50%;
+        display: grid; place-items: center;
+        font-size: 11px; font-weight: 700; color: #fff;
+      }
+      .more { color: var(--muted); align-self: center; font-size: 12px; padding-left: 2px; }
+      .story { border-top: 1px solid var(--hair); padding: 8px 16px 10px; }
+      .story:empty { display: none; }
+      .item { display: flex; gap: 10px; padding: 6px 0; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+      .dot-b { background: var(--bad); } .dot-w { background: var(--warn); } .dot-g { background: var(--ok); }
+      .item b { font-weight: 650; }
+      .item .note { color: var(--muted); font-size: 12px; }
+      details { border-top: 1px solid var(--hair); }
+      summary {
+        list-style: none; cursor: pointer;
+        padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--muted);
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: '▾'; }
+      details[open] summary::after { content: '▴'; }
+      .list { max-height: 330px; overflow-y: auto; padding-bottom: 6px; }
       .sec {
         padding: 9px 16px 3px;
         font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
         color: var(--muted);
-        border-top: 1px solid var(--hair);
       }
       .row { display: flex; align-items: baseline; gap: 7px; padding: 4px 16px; }
       .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -65,8 +97,13 @@
         <div class="sub" id="sub"></div>
       </div>
     </header>
-    <div class="why" id="why"></div>
-    <div class="list" id="list"></div>
+    <div class="verdict" id="verdict"></div>
+    <div class="who" id="who"></div>
+    <div class="story" id="story"></div>
+    <details id="details" hidden>
+      <summary>Full technical list</summary>
+      <div class="list" id="list"></div>
+    </details>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
