@@ -1,3 +1,55 @@
+# Roadmap
+
+Free tier is feature-complete (inventory, fingerprinting, cookie meaning
+layer, device alerts, score, cross-site ledger, forget-on-close, badge,
+brand logos, actor cards). What remains, in ship order:
+
+## Phase A — ship the free tier (Web Store v0.1)
+
+- A1. Toolbar/store icon set (16/32/48/128). Still the default placeholder;
+  store blocker. Dial/shield mark, brand colors.
+- A2. "Your browser blocked N more" counter: webRequest onErrorOccurred with
+  net::ERR_BLOCKED_BY_CLIENT. Fixes the Brave credibility gap (dailymail
+  scoring 82 behind Shields).
+- A3. Score calibration from real browsing (weights are one block in
+  main.ts; needs gut feel, not code).
+- A4. Store packaging: listing copy, screenshots, one-sentence privacy
+  policy ("collects nothing, talks to no one"), zip upload.
+
+Rationale: review queues take days and real users generate the feedback
+Pro needs. Ship free first.
+
+## Phase B — Pro core (v0.2, the paid unlock)
+
+- B1. Block trackers per site: dynamic declarativeNetRequest rules built
+  from the trackers the inspector surfaced (never a bulk list). Block
+  toggle on each company card + "block all on this site". Blocked count
+  replaces request count; feeds badge and hero.
+- B2. Fingerprint defense: the MAIN-world probe flips from observe to
+  spoof: noised canvas pixels, generic GPU strings, capped font probes.
+  Turns "tried to fingerprint you" into "tried, and got garbage".
+- B3. ExtensionPay gate wiring B1+B2 as the Pro bundle. $2.99–4.99/mo or
+  ~$30/yr per spec.
+
+## Phase C — Pro depth (retention)
+
+- C1. History dashboard (full extension page): "who tracked you this
+  week" from the ledger, plus honest score context ("worse than 70% of
+  sites you visit").
+- C2. Alerts: notify when a site fingerprints / asks for mic/camera
+  (chrome.notifications on probe signals; per-user rules).
+- C3. Exportable report: local HTML/JSON site report or weekly summary.
+
+## Backlog (free, nice-to-have, all pass the local test)
+
+- URL-decoration detector: flag fbclid/gclid-style params, "copy clean
+  link" button.
+- Global Privacy Control: send Sec-GPC header via a DNR header rule
+  (user toggle).
+
+Every new idea runs the spec test: needs a server, account, or per-user
+support → reject.
+
 # Popup — product flow & UI scope
 
 Working scope for the popup rebuild. Invariant unchanged: everything local.
