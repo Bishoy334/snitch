@@ -40,6 +40,8 @@
       }
       .verdict, .story, .list { user-select: text; }
       :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+      /* Chrome marks a clicked <summary> as :focus-visible; no ring on disclosure rows */
+      summary:focus { outline: none; }
       ::selection { background: color-mix(in srgb, var(--focus) 28%, transparent); }
 
       .g-A { color: var(--g-a); } .g-B { color: var(--g-b); } .g-C { color: var(--g-c); }
