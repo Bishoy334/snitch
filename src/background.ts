@@ -4,6 +4,7 @@ import trackerDb from './data/trackers.json'
 type Tracker = { company: string; category: string }
 type TabReport = {
   site: string
+  siteCompany: string | null
   requests: Record<string, { count: number; tracker: Tracker | null }>
 }
 
@@ -33,7 +34,7 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (tabId < 0) return
     const host = new URL(url).hostname
     if (type === 'main_frame') {
-      reports.set(tabId, { site: host, requests: {} })
+      reports.set(tabId, { site: host, siteCompany: lookupTracker(host)?.company ?? null, requests: {} })
       save(tabId)
       return
     }

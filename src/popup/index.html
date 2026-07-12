@@ -4,20 +4,69 @@
     <meta charset="utf-8" />
     <title>Privacy Inspector</title>
     <style>
-      body { font: 13px/1.4 system-ui; width: 340px; margin: 0; padding: 12px; }
-      h1 { font-size: 14px; margin: 0 0 2px; }
-      .site { color: #666; margin-bottom: 10px; }
-      .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-top: 1px solid #eee; }
+      :root {
+        --bg: #ffffff;
+        --ink: #1b1e22;
+        --muted: #6b7280;
+        --hair: #ebebeb;
+        --track: #c03535;
+        --g-a: #2e8f57; --g-b: #6fa33c; --g-c: #d99114; --g-d: #d96a2e; --g-f: #cf4141;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #202225;
+          --ink: #ececec;
+          --muted: #9aa0a6;
+          --hair: #34373c;
+          --track: #f27d7d;
+          --g-a: #57c288; --g-b: #9cc45e; --g-c: #e8b04a; --g-d: #eb8a54; --g-f: #ef7070;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        font: 13px/1.45 system-ui, sans-serif;
+        background: var(--bg); color: var(--ink);
+        width: 360px; margin: 0;
+      }
+      header { display: flex; gap: 12px; align-items: center; padding: 14px 16px 10px; }
+      .seal {
+        width: 46px; height: 46px; flex-shrink: 0;
+        border-radius: 10px; border: 1.5px solid currentColor;
+        display: grid; place-items: center;
+        font: 700 26px/1 Georgia, 'Iowan Old Style', serif;
+        background: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      .g-A { color: var(--g-a); } .g-B { color: var(--g-b); } .g-C { color: var(--g-c); }
+      .g-D { color: var(--g-d); } .g-F { color: var(--g-f); } .g-none { color: var(--muted); }
+      .head-text { min-width: 0; }
+      .site { font-weight: 650; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .sub { color: var(--muted); font-size: 12px; }
+      .why { padding: 0 16px 12px; }
+      .list { max-height: 430px; overflow-y: auto; }
+      .sec {
+        padding: 9px 16px 3px;
+        font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--muted);
+        border-top: 1px solid var(--hair);
+      }
+      .row { display: flex; align-items: baseline; gap: 7px; padding: 4px 16px; }
       .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .tag { color: #b00; font-weight: 600; }
-      .count { color: #999; flex-shrink: 0; }
-      .empty { color: #666; padding: 8px 0; }
+      .chip { font-size: 11px; color: var(--muted); white-space: nowrap; }
+      .chip.hot { color: var(--track); font-weight: 600; }
+      .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .empty { padding: 6px 16px 16px; color: var(--muted); }
     </style>
   </head>
   <body>
-    <h1>Privacy Inspector</h1>
-    <div class="site" id="site"></div>
-    <div id="list"></div>
+    <header>
+      <div class="seal g-none" id="seal">·</div>
+      <div class="head-text">
+        <div class="site" id="site"></div>
+        <div class="sub" id="sub"></div>
+      </div>
+    </header>
+    <div class="why" id="why"></div>
+    <div class="list" id="list"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
