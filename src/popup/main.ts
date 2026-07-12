@@ -210,6 +210,7 @@ function makeRow(label: string, chipText: string, count?: number): HTMLElement {
 // actor card: header + always-visible meaning lines, hostnames on expand
 function card(opts: {
   name: string
+  nameUrl?: string
   mono?: string
   monoUrl?: string
   catText?: string
@@ -229,7 +230,16 @@ function card(opts: {
     img.alt = ''
     head.append(img)
   } else if (opts.mono !== undefined) head.append(monogram('mono', opts.mono || opts.name))
-  head.append(el('span', 'cname', opts.name))
+  if (opts.nameUrl) {
+    const a = el('a', 'cname', opts.name) as HTMLAnchorElement
+    a.href = opts.nameUrl
+    a.target = '_blank'
+    a.rel = 'noreferrer'
+    a.title = `Open ${new URL(opts.nameUrl).hostname.replace(/^www\./, '')}`
+    head.append(a)
+  } else {
+    head.append(el('span', 'cname', opts.name))
+  }
   if (opts.catText) head.append(el('span', 'ccat', opts.catText))
   if (opts.requests !== undefined)
     head.append(el('span', 'creq', `${opts.requests} request${opts.requests === 1 ? '' : 's'}`))
@@ -346,9 +356,11 @@ if (restricted) {
   // hero text
   const byCompany = new Map<string, { total: number; cats: Set<string>; hosts: Entry[] }>()
   const rawOf = new Map<string, string>()
+  const urlOf = new Map<string, string>()
   for (const e of tracking) {
     const name = displayName(e.tracker!.company)
     rawOf.set(name, e.tracker!.company)
+    if (e.tracker!.url && !urlOf.has(name)) urlOf.set(name, e.tracker!.url)
     const g = byCompany.get(name) ?? { total: 0, cats: new Set<string>(), hosts: [] }
     g.total += e.count
     g.cats.add(niceCat(e.tracker!.category))
@@ -385,21 +397,17 @@ if (restricted) {
     verdictLine('This page kept everything to itself.')
   }
 
-  // company pills: click to jump to that company's card
-  const cardEls = new Map<string, HTMLDetailsElement>()
+  // company pills: link straight to the company's site when we know it
   for (const name of names.slice(0, 4)) {
-    const pill = el('button', 'pill') as HTMLButtonElement
-    pill.setAttribute('aria-label', `Show details for ${name}`)
+    const url = urlOf.get(name)
+    const pill = el(url ? 'a' : 'span', 'pill')
+    if (url) {
+      const a = pill as HTMLAnchorElement
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noreferrer'
+    }
     pill.append(monogram('mono', name), name)
-    pill.addEventListener('click', () => {
-      const target = cardEls.get(name)
-      if (!target) return
-      ;($('details') as HTMLDetailsElement & { open: boolean }).open = true
-      target.open = true
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      target.classList.add('flash')
-      setTimeout(() => target.classList.remove('flash'), 1200)
-    })
     $('who').append(pill)
   }
   if (names.length > 4) $('who').append(el('span', 'more', `+${names.length - 4} more`))
@@ -503,35 +511,25 @@ if (restricted) {
     }
     if (holder && holder.life > 86400 && !others) subs.push(`Left a cookie that lasts ${span(holder.life)}`)
 
-    // expansion detail: which sites you met them on, and who they are
+    // expansion detail: which sites you actually met them on
     const detail: HTMLElement[] = []
     const seenSites = Object.keys(ledger[rawOf.get(name) ?? name] ?? {})
       .filter((d) => d !== siteDomain)
       .slice(0, 5)
     if (seenSites.length) detail.push(el('div', 'cdetail', `Also seen on ${seenSites.join(', ')}`))
-    const homepage = g.hosts.find((e) => e.tracker?.url)?.tracker?.url
-    if (homepage) {
-      const line = el('div', 'cdetail')
-      const a = document.createElement('a')
-      a.href = homepage
-      a.target = '_blank'
-      a.rel = 'noreferrer'
-      a.textContent = `About ${name} · ${new URL(homepage).hostname.replace(/^www\./, '')} ↗`
-      line.append(a)
-      detail.push(line)
-    }
 
-    const cardEl = card({
-      name,
-      mono: name,
-      catText: [...g.cats].join(', '),
-      requests: g.total,
-      subs,
-      detail,
-      hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
-    }) as HTMLDetailsElement
-    cardEls.set(name, cardEl)
-    list.append(cardEl)
+    list.append(
+      card({
+        name,
+        nameUrl: urlOf.get(name),
+        mono: name,
+        catText: [...g.cats].join(', '),
+        requests: g.total,
+        subs,
+        detail,
+        hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
+      }),
+    )
   }
 
   // the site itself
