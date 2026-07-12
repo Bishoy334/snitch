@@ -168,21 +168,17 @@ function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string, 
   if (tip) {
     const btn = el('button', 'info', 'i') as HTMLButtonElement
     btn.setAttribute('aria-label', 'More about this')
-    const tipEl = el('div', 'note', tip)
-    tipEl.hidden = true
-    btn.addEventListener('click', () => {
-      tipEl.hidden = !tipEl.hidden
-      btn.classList.toggle('on', !tipEl.hidden)
-    })
+    const tipEl = el('div', 'tipcard', tip)
+    btn.addEventListener('click', () => tipEl.classList.toggle('on'))
     head_.append(btn)
     txt.append(head_)
     if (note) txt.append(el('div', 'note', note))
-    txt.append(tipEl)
+    item.append(txt, tipEl)
   } else {
     txt.append(head_)
     if (note) txt.append(el('div', 'note', note))
+    item.append(txt)
   }
-  item.append(txt)
   $('story').append(item)
 }
 
