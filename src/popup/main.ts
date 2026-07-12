@@ -28,10 +28,10 @@ const NICE: Record<string, string> = {
 const niceCat = (c: string) => NICE[c] ?? c.toLowerCase()
 
 const FP_LABELS: Record<string, string> = {
-  canvas: 'Read pixels from a hidden canvas',
-  webgl: 'Asked WebGL for your GPU model',
+  canvas: 'Read a hidden canvas',
+  webgl: 'Asked for your GPU model',
   audio: 'Probed your audio stack',
-  fonts: 'Scanned your installed fonts',
+  fonts: 'Scanned your fonts',
 }
 const FP_PHRASES: Record<string, string> = {
   canvas: 'hidden canvas pixels',
@@ -111,6 +111,27 @@ function verdictLine(...parts: (string | HTMLElement)[]) {
 }
 const bold = (t: string) => el('b', '', t)
 
+function monogram(cls: string, name: string): HTMLElement {
+  const m = el('span', cls, (name[0] ?? '?').toUpperCase())
+  m.style.background = brandColor(name)
+  return m
+}
+
+function favicon(url: string | undefined, site: string) {
+  if (url && /^https?:/.test(url)) {
+    const img = document.createElement('img')
+    img.alt = ''
+    img.src = chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`)
+    img.onerror = () => {
+      img.remove()
+      $('fav').append(monogram('letter', site))
+    }
+    $('fav').append(img)
+  } else {
+    $('fav').append(monogram('letter', site || '?'))
+  }
+}
+
 function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string) {
   const item = el('div', 'item')
   const ico = el('span', `ico ico-${sev}`)
@@ -123,37 +144,46 @@ function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string) 
   $('story').append(item)
 }
 
-function makeRow(label: string, chipText: string, hot: boolean, count?: number): HTMLElement {
+function makeRow(label: string, chipText: string, count?: number): HTMLElement {
   const div = el('div', 'row')
   div.append(el('span', 'host', label))
-  if (chipText) div.append(el('span', hot ? 'chip hot' : 'chip', chipText))
+  if (chipText) div.append(el('span', 'chip', chipText))
   if (count !== undefined) div.append(el('span', 'count', String(count)))
   return div
 }
 
-function section(title: string, rows: HTMLElement[]) {
-  if (!rows.length) return
-  $('list').append(el('div', 'sec', title), ...rows)
+function sec(title: string, badge?: string): HTMLElement {
+  return el('div', 'sec', badge ? `${title} · ${badge}` : title)
 }
 
-function sitePhoto(site: string) {
-  chrome.tabs
-    .captureVisibleTab({ format: 'jpeg', quality: 60 })
-    .then((url) => {
-      const img = document.createElement('img')
-      img.src = url
-      img.alt = ''
-      $('shot').append(img)
-    })
-    .catch(() => {
-      const letter = el('div', 'letter', (site[0] ?? '?').toUpperCase())
-      letter.style.background = `linear-gradient(135deg, ${brandColor(site)}, color-mix(in srgb, ${brandColor(site)} 55%, #000))`
-      $('shot').append(letter)
-    })
+// company card: header row, hostnames on expand
+function card(opts: {
+  name: string
+  mono?: string
+  catText?: string
+  redDot?: boolean
+  requests: number
+  hosts: { label: string; count?: number }[]
+}): HTMLElement {
+  const d = document.createElement('details')
+  d.className = 'card'
+  const s = document.createElement('summary')
+  if (opts.mono !== undefined) s.append(monogram('mono', opts.mono || opts.name))
+  s.append(el('span', 'cname', opts.name))
+  if (opts.catText) {
+    const cat = el('span', 'ccat')
+    cat.append(el('span', `dot${opts.redDot ? '' : ' neutral'}`), opts.catText)
+    s.append(cat)
+  }
+  s.append(el('span', 'creq', `${opts.requests} request${opts.requests === 1 ? '' : 's'}`))
+  d.append(s)
+  const hosts = el('div', 'hosts')
+  for (const h of opts.hosts) hosts.append(makeRow(h.label, '', h.count))
+  d.append(hosts)
+  return d
 }
 
 function setDial(score: number | null) {
-  const gauge = $('gauge')
   if (score === null) {
     $('score').textContent = '·'
     $('gword').textContent = 'Not inspected'
@@ -161,10 +191,10 @@ function setDial(score: number | null) {
   }
   const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'F'
   const words: Record<string, string> = { A: 'Excellent', B: 'Good', C: 'Okay', D: 'Poor', F: 'Awful' }
-  gauge.className = `gauge g-${grade}`
+  $('gauge').className = `gauge g-${grade}`
   $('score').textContent = String(score)
   $('gword').textContent = words[grade]
-  const CIRC = 201
+  const CIRC = 170
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       ;($('prog') as unknown as SVGCircleElement).style.strokeDashoffset = String(CIRC * (1 - score / 100))
@@ -175,14 +205,27 @@ function setDial(score: number | null) {
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
 const key = `tab-${tab.id}`
 const report = (await chrome.storage.session.get(key))[key] as TabReport | undefined
-const tabHost = tab.url ? new URL(tab.url).hostname : ''
+const tabUrl = tab.url ?? ''
+const tabHost = /^https?:/.test(tabUrl) ? new URL(tabUrl).hostname : ''
+const restricted = !tabHost
 
-sitePhoto(report?.site || tabHost)
+favicon(tabUrl, report?.site || tabHost)
 
-if (!report) {
+if (restricted) {
+  $('site').textContent = 'This page is off limits'
+  $('gauge').hidden = true
+  verdictLine("Chrome doesn't let extensions see its own pages, so there's nothing to inspect here.")
+} else if (!report) {
   setDial(null)
-  $('siteline').append(bold(tabHost || tab.url || ''))
-  verdictLine('Reload the page and this report fills in.')
+  $('site').textContent = tabHost
+  $('stat').textContent = 'Not inspected yet'
+  verdictLine('This tab was open before the inspector arrived.')
+  const btn = el('button', '', 'Reload page') as HTMLButtonElement
+  btn.addEventListener('click', () => {
+    chrome.tabs.reload(tab.id!)
+    window.close()
+  })
+  $('cta').append(btn)
 } else {
   const entries: Entry[] = Object.entries(report.requests)
     .map(([host, r]) => ({ host, ...r }))
@@ -192,11 +235,14 @@ if (!report) {
     (e) => e.tracker && e.tracker.category !== 'Content' && e.tracker.company !== report.siteCompany,
   )
   const own = entries.filter((e) => e.tracker && e.tracker.company === report.siteCompany)
-  const other = entries.filter((e) => !tracking.includes(e) && !own.includes(e))
+  const content = entries.filter((e) => e.tracker?.category === 'Content' && !own.includes(e))
+  const unknown = entries.filter((e) => !e.tracker)
 
   const signals = report.fingerprinting ?? []
-  const fp = signals.filter((f) => f.kind in FP_LABELS)
-  const device = signals.filter((f) => f.kind in API_LABELS)
+  const seen = new Set<string>()
+  const deduped = signals.filter((f) => !seen.has(`${f.kind}|${f.host}`) && seen.add(`${f.kind}|${f.host}`))
+  const fp = deduped.filter((f) => f.kind in FP_LABELS)
+  const device = deduped.filter((f) => f.kind in API_LABELS)
   const fpKinds = [...new Set(fp.map((f) => f.kind))]
 
   // cookies & storage, queried live so the story can use real lifetimes
@@ -227,28 +273,33 @@ if (!report) {
   // score
   const penalty =
     tracking.reduce((sum, e) => sum + (WEIGHTS[e.tracker!.category] ?? 5), 0) +
-    Math.min(other.length, 10) +
+    Math.min(content.length + unknown.length, 10) +
     Math.min(fpKinds.length * 20, 40)
   const score = Math.max(0, 100 - penalty)
   setDial(score)
 
-  // site line
-  const byCompany = new Map<string, number>()
-  for (const e of tracking)
-    byCompany.set(e.tracker!.company, (byCompany.get(e.tracker!.company) ?? 0) + e.count)
-  const companies = [...byCompany.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => displayName(name))
-  $('siteline').append(
-    bold(report.site),
-    tracking.length
-      ? ` · ${tracking.length} tracker${tracking.length > 1 ? 's' : ''} from ${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`
-      : ' · no known trackers',
-  )
+  // hero text
+  const byCompany = new Map<string, { total: number; cats: Set<string>; hosts: Entry[] }>()
+  for (const e of tracking) {
+    const name = displayName(e.tracker!.company)
+    const g = byCompany.get(name) ?? { total: 0, cats: new Set<string>(), hosts: [] }
+    g.total += e.count
+    g.cats.add(niceCat(e.tracker!.category))
+    g.hosts.push(e)
+    byCompany.set(name, g)
+  }
+  const companies = [...byCompany.entries()].sort((a, b) => b[1].total - a[1].total)
+  $('site').textContent = report.site
+  $('stat').textContent = tracking.length
+    ? `${tracking.length} tracker${tracking.length > 1 ? 's' : ''} · ${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`
+    : 'No known trackers'
 
   // verdict
+  const names = companies.map(([n]) => n)
   if (tracking.length && fpKinds.length) {
     verdictLine(
       'This page shared your visit with ',
-      bold(companies.length === 1 ? companies[0] : `${companies.length} companies`),
+      bold(names.length === 1 ? names[0] : `${names.length} companies`),
       ' and tried to ',
       bold('fingerprint your device'),
       '.',
@@ -256,7 +307,7 @@ if (!report) {
   } else if (tracking.length) {
     verdictLine(
       'This page shared your visit with ',
-      bold(companies.length === 1 ? companies[0] : `${companies.length} companies`),
+      bold(names.length === 1 ? names[0] : `${names.length} companies`),
       '.',
     )
   } else if (fpKinds.length) {
@@ -268,30 +319,14 @@ if (!report) {
   }
 
   // company pills
-  for (const name of companies.slice(0, 4)) {
+  for (const name of names.slice(0, 4)) {
     const pill = el('span', 'pill')
-    const mono = el('span', 'mono', name[0]?.toUpperCase() ?? '?')
-    mono.style.background = brandColor(name)
-    pill.append(mono, name)
+    pill.append(monogram('mono', name), name)
     $('who').append(pill)
   }
-  if (companies.length > 4) $('who').append(el('span', 'more', `+${companies.length - 4} more`))
+  if (names.length > 4) $('who').append(el('span', 'more', `+${names.length - 4} more`))
 
-  // story
-  if (tracking.length) {
-    const head =
-      companies.length <= 2
-        ? `${joinHuman(companies)} saw you on this page.`
-        : `${companies[0]}, ${companies[1]} and ${companies.length - 2} other compan${companies.length - 2 > 1 ? 'ies' : 'y'} saw you on this page.`
-    const cats = new Set(tracking.map((e) => e.tracker!.category))
-    const note = cats.has('Advertising')
-      ? 'This feeds the profiles they use to pick ads for you.'
-      : cats.has('Social')
-        ? 'Their embeds report your visit whether or not you touch them.'
-        : 'They log what you do here and report it back.'
-    story('b', 'eye', head, note)
-  }
-
+  // story: fingerprinting, trackers, device, cookies, one green line
   if (fpKinds.length) {
     story(
       'b',
@@ -301,6 +336,24 @@ if (!report) {
     )
   }
 
+  if (tracking.length) {
+    const head =
+      names.length <= 2
+        ? `${joinHuman(names)} saw you on this page.`
+        : `${names[0]}, ${names[1]} and ${names.length - 2} other compan${names.length - 2 > 1 ? 'ies' : 'y'} saw you on this page.`
+    const cats = new Set(tracking.map((e) => e.tracker!.category))
+    const note = cats.has('Advertising')
+      ? 'This feeds the profiles they use to pick ads for you.'
+      : cats.has('Social')
+        ? 'Their embeds report your visit whether or not you touch them.'
+        : 'They log what you do here and report it back.'
+    story('b', 'eye', head, note)
+  }
+
+  const asked = [...new Set(device.map((d) => d.kind))].filter((k) => k in API_PHRASES)
+  if (asked.length) story('b', 'radar', `Asked for ${joinHuman(asked.map((k) => API_PHRASES[k]))}.`)
+  if (device.some((d) => d.kind === 'clipboard')) story('b', 'radar', 'Read your clipboard.')
+
   if (cookieHolders.length && longestLife > 86400) {
     const head =
       cookieHolders.length === 1
@@ -308,10 +361,6 @@ if (!report) {
         : `${cookieHolders.length} trackers left cookies that last up to ${span(longestLife)}.`
     story('w', 'cookie', head)
   }
-
-  const asked = [...new Set(device.map((d) => d.kind))].filter((k) => k in API_PHRASES)
-  if (asked.length) story('b', 'radar', `Asked for ${joinHuman(asked.map((k) => API_PHRASES[k]))}.`)
-  if (device.some((d) => d.kind === 'clipboard')) story('b', 'radar', 'Read your clipboard.')
 
   // one true reassurance line
   if (!tracking.length && !fpKinds.length && !device.length && !entries.length) {
@@ -324,30 +373,99 @@ if (!report) {
     story('g', 'shield', 'No device fingerprinting detected.')
   }
 
-  // full technical list
+  // Level 2: receipts
   $('details').hidden = false
-  section(
-    'Fingerprinting',
-    fp.map((f) =>
-      makeRow(FP_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : '', true),
-    ),
-  )
-  section(
-    'Device access',
-    device.map((f) =>
-      makeRow(API_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : '', true),
-    ),
-  )
-  const entryRow = (e: Entry, hot: boolean) =>
-    makeRow(e.host, e.tracker ? `${e.tracker.company} · ${niceCat(e.tracker.category)}` : '', hot, e.count)
-  section('Trackers', tracking.map((e) => entryRow(e, true)))
-  if (report.siteCompany) section(`Same company · ${report.siteCompany}`, own.map((e) => entryRow(e, false)))
-  section('Other third parties', other.map((e) => entryRow(e, false)))
-  if (siteDomain) {
-    const rows = [makeRow(`Set by ${siteDomain}`, `${siteCookies.filter((c) => c.expirationDate).length} persistent`, false, siteCookies.length)]
-    cookieHolders.slice(0, 6).forEach((h) => rows.push(makeRow(h.domain, 'cookies on you', true, h.cookies.length)))
-    if (storage) rows.push(makeRow('Local storage', `${storage.session} session`, false, storage.local))
-    section('Cookies & storage', rows)
+  const list = $('list')
+
+  if (fp.length) {
+    list.append(sec('Fingerprinting', String(fp.length)))
+    for (const f of fp)
+      list.append(makeRow(FP_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : ''))
   }
-  if (!entries.length) $('list').append(el('div', 'empty', 'No third-party requests on this page.'))
+  if (device.length) {
+    list.append(sec('Device access', String(device.length)))
+    for (const f of device)
+      list.append(makeRow(API_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : ''))
+  }
+
+  if (companies.length) {
+    list.append(sec('Trackers', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
+    for (const [name, g] of companies) {
+      list.append(
+        card({
+          name,
+          mono: name,
+          catText: [...g.cats].join(', '),
+          redDot: true,
+          requests: g.total,
+          hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
+        }),
+      )
+    }
+  }
+
+  const quietCards: HTMLElement[] = []
+  if (own.length && report.siteCompany) {
+    quietCards.push(
+      card({
+        name: `${displayName(report.siteCompany)}'s own services`,
+        catText: 'same owner as this site',
+        requests: own.reduce((s, e) => s + e.count, 0),
+        hosts: own.map((e) => ({ label: e.host, count: e.count })),
+      }),
+    )
+  }
+  if (content.length) {
+    quietCards.push(
+      card({
+        name: 'Content delivery',
+        catText: 'fonts, scripts, media · not tracking',
+        requests: content.reduce((s, e) => s + e.count, 0),
+        hosts: content.map((e) => ({
+          label: e.tracker ? `${e.host} (${displayName(e.tracker.company)})` : e.host,
+          count: e.count,
+        })),
+      }),
+    )
+  }
+  if (unknown.length) {
+    quietCards.push(
+      card({
+        name: 'Unrecognized domains',
+        catText: 'not in the tracker database',
+        requests: unknown.reduce((s, e) => s + e.count, 0),
+        hosts: unknown.map((e) => ({ label: e.host, count: e.count })),
+      }),
+    )
+  }
+  if (quietCards.length) {
+    list.append(sec('Everything else'), ...quietCards)
+  }
+
+  // cookies & storage as sentences
+  const facts: HTMLElement[] = []
+  if (siteDomain && siteCookies.length) {
+    const persistent = siteCookies.filter((c) => c.expirationDate).length
+    const f = el('div', 'fact')
+    f.append(bold(siteDomain), ` set ${siteCookies.length} cookie${siteCookies.length > 1 ? 's' : ''}`)
+    if (persistent) f.append(`; ${persistent} stay${persistent === 1 ? 's' : ''} after you leave.`)
+    else f.append('; all expire when you close the tab.')
+    facts.push(f)
+  }
+  if (cookieHolders.length) {
+    const shown = cookieHolders.slice(0, 3).map((h) => `${h.domain} (${h.cookies.length})`)
+    const extra = cookieHolders.length > 3 ? ` and ${cookieHolders.length - 3} more` : ''
+    facts.push(el('div', 'fact', `Trackers holding cookies on you: ${shown.join(', ')}${extra}.`))
+  }
+  if (storage && (storage.local || storage.session)) {
+    facts.push(el('div', 'fact', `Local storage: ${storage.local} item${storage.local === 1 ? '' : 's'} · session storage: ${storage.session}.`))
+  }
+  if (facts.length) {
+    list.append(sec('Cookies & storage'))
+    const wrap = el('div', 'facts')
+    wrap.append(...facts)
+    list.append(wrap)
+  }
+
+  if (!entries.length) list.append(el('div', 'empty', 'No third-party requests on this page.'))
 }

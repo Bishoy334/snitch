@@ -10,7 +10,7 @@
         --muted: #6b7280;
         --hair: #ebebeb;
         --chipbg: #f3f4f6;
-        --track: #c03535;
+        --focus: #4c8dff;
         --bad: #cf4141; --warn: #d99114; --ok: #2e8f57;
         --g-a: #2e8f57; --g-b: #6fa33c; --g-c: #d99114; --g-d: #d96a2e; --g-f: #cf4141;
       }
@@ -21,7 +21,7 @@
           --muted: #9aa0a6;
           --hair: #34373c;
           --chipbg: #2b2e33;
-          --track: #f27d7d;
+          --focus: #7aa7ff;
           --bad: #ef7070; --warn: #e8b04a; --ok: #57c288;
           --g-a: #57c288; --g-b: #9cc45e; --g-c: #e8b04a; --g-d: #eb8a54; --g-f: #ef7070;
         }
@@ -30,46 +30,61 @@
       body {
         font: 13px/1.5 system-ui, sans-serif;
         background: var(--bg); color: var(--ink);
-        width: 360px; margin: 0;
+        width: 360px; margin: 0; max-height: 600px;
+        user-select: none;
       }
+      .verdict, .story, .list, .facts { user-select: text; }
+      :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+      ::selection { background: color-mix(in srgb, var(--focus) 28%, transparent); }
+
       .g-A { color: var(--g-a); } .g-B { color: var(--g-b); } .g-C { color: var(--g-c); }
       .g-D { color: var(--g-d); } .g-F { color: var(--g-f); } .g-none { color: var(--muted); }
 
-      .hero { display: flex; gap: 14px; padding: 14px 16px 8px; align-items: center; }
-      .shot {
-        flex: 1; min-width: 0; aspect-ratio: 16 / 10;
-        border-radius: 10px; border: 1px solid var(--hair); overflow: hidden;
-        display: grid; place-items: center; position: relative;
-        background: var(--chipbg);
+      /* hero */
+      .hero { display: flex; gap: 12px; align-items: center; padding: 16px 16px 8px; }
+      .fav {
+        width: 40px; height: 40px; flex-shrink: 0;
+        border-radius: 10px; border: 1px solid var(--hair); background: var(--chipbg);
+        display: grid; place-items: center; overflow: hidden;
       }
-      .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-      .shot .letter {
-        font: 700 30px Georgia, 'Iowan Old Style', serif; color: #fff;
+      .fav img { width: 24px; height: 24px; border-radius: 5px; }
+      .fav .letter {
         width: 100%; height: 100%; display: grid; place-items: center;
+        font: 650 18px Georgia, 'Iowan Old Style', serif; color: #fff;
       }
-      .gauge { flex-shrink: 0; width: 80px; text-align: center; }
-      .dial { position: relative; width: 76px; height: 76px; margin: 0 auto; }
-      .dial svg { display: block; }
-      .dial .trackring { fill: none; stroke: var(--hair); stroke-width: 7; }
+      .head { flex: 1; min-width: 0; }
+      .site { font-weight: 650; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .stat { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gauge { flex-shrink: 0; width: 72px; text-align: center; }
+      .dial { position: relative; width: 64px; height: 64px; margin: 0 auto; }
+      .dial .trackring { fill: none; stroke: var(--hair); stroke-width: 6; }
       .dial .prog {
-        fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round;
-        stroke-dasharray: 201; stroke-dashoffset: 201;
+        fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round;
+        stroke-dasharray: 170; stroke-dashoffset: 170;
         transform: rotate(-90deg); transform-origin: center;
         transition: stroke-dashoffset 0.6s ease;
       }
-      @media (prefers-reduced-motion: reduce) { .dial .prog { transition: none; } }
+      @media (prefers-reduced-motion: reduce) {
+        .dial .prog, summary::after, .card summary::before { transition: none !important; }
+      }
       .dial .num {
         position: absolute; inset: 0; display: grid; place-items: center;
-        font-weight: 700; font-size: 21px; color: var(--ink);
+        font-weight: 700; font-size: 19px; color: var(--ink);
       }
-      .gword { font-size: 11px; font-weight: 650; margin-top: 3px; }
+      .gword { font-size: 11px; font-weight: 650; margin-top: 2px; }
 
-      .siteline {
-        padding: 0 16px 8px; color: var(--muted); font-size: 12px;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      .verdict { padding: 2px 16px 10px; font-size: 15px; line-height: 1.4; }
+      .verdict b { font-weight: 650; }
+      #cta { padding: 0 16px 12px; }
+      #cta:empty { display: none; }
+      button {
+        font: 600 13px system-ui, sans-serif;
+        border-radius: 8px; padding: 8px 14px; cursor: pointer;
+        border: 1px solid var(--hair); background: var(--ink); color: var(--bg);
+        transition: opacity 0.15s ease;
       }
-      .siteline b { color: var(--ink); font-size: 13px; }
-      .verdict { padding: 0 16px 10px; }
+      button:hover { opacity: 0.85; }
+
       .who { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
       .who:empty { display: none; }
       .pill {
@@ -78,13 +93,14 @@
         padding: 3px 10px 3px 4px; font-size: 12px; font-weight: 550;
       }
       .mono {
-        width: 20px; height: 20px; border-radius: 50%;
+        width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
         display: grid; place-items: center;
         font-size: 11px; font-weight: 700; color: #fff;
       }
       .more { color: var(--muted); align-self: center; font-size: 12px; padding-left: 2px; }
 
-      .story { border-top: 1px solid var(--hair); padding: 10px 16px; display: grid; gap: 9px; }
+      /* story */
+      .story { border-top: 1px solid var(--hair); padding: 12px 16px; display: grid; gap: 10px; }
       .story:empty { display: none; }
       .item { display: flex; gap: 10px; align-items: flex-start; }
       .ico {
@@ -98,48 +114,84 @@
       .item b { font-weight: 650; }
       .item .note { color: var(--muted); font-size: 12px; }
 
-      details { border-top: 1px solid var(--hair); }
+      /* details */
+      details.main { border-top: 1px solid var(--hair); }
       summary {
         list-style: none; cursor: pointer;
-        padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--muted);
         display: flex; justify-content: space-between; align-items: center;
+        transition: background 0.15s ease;
       }
       summary::-webkit-details-marker { display: none; }
-      summary::after { content: '▾'; }
-      details[open] summary::after { content: '▴'; }
-      .list { max-height: 300px; overflow-y: auto; padding-bottom: 6px; }
+      summary:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+      details.main > summary {
+        padding: 11px 16px; font-size: 12px; font-weight: 600; color: var(--muted);
+      }
+      details.main > summary::after {
+        content: '▾'; display: inline-block; transition: transform 0.15s ease;
+      }
+      details.main[open] > summary::after { transform: rotate(180deg); }
+
+      .list { max-height: 300px; overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--hair) transparent; }
+      .list::-webkit-scrollbar { width: 8px; }
+      .list::-webkit-scrollbar-track { background: transparent; }
+      .list::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 99px; border: 2px solid var(--bg); }
+
       .sec {
-        padding: 9px 16px 3px;
+        padding: 10px 16px 4px;
         font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
         color: var(--muted);
       }
-      .row { display: flex; align-items: baseline; gap: 7px; padding: 4px 16px; }
-      .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .chip { font-size: 11px; color: var(--muted); white-space: nowrap; }
-      .chip.hot { color: var(--track); font-weight: 600; }
-      .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .row {
+        display: flex; align-items: baseline; gap: 7px;
+        padding: 5px 16px; border-radius: 4px;
+        transition: background 0.15s ease;
+      }
+      .row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+      .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+      .chip { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 4; }
+      .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+      /* company cards */
+      .card > summary { padding: 6px 16px; gap: 8px; }
+      .card .cname { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card .cname { flex-shrink: 0; max-width: 55%; }
+      .card .ccat { font-size: 11px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 4px; overflow: hidden; flex-shrink: 4; }
+      .card .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--bad); }
+      .card .dot.neutral { background: var(--muted); }
+      .card .creq { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .card .hosts { padding: 0 0 4px; }
+      .card .hosts .row { padding-left: 44px; color: var(--muted); font-size: 12px; }
+
+      .facts { padding: 0 16px 6px; display: grid; gap: 4px; }
+      .fact { color: var(--muted); font-size: 12.5px; }
+      .fact b { color: var(--ink); font-weight: 600; }
+
       .empty { padding: 6px 16px 16px; color: var(--muted); }
     </style>
   </head>
   <body>
     <div class="hero">
-      <div class="shot" id="shot"></div>
+      <div class="fav" id="fav"></div>
+      <div class="head">
+        <div class="site" id="site"></div>
+        <div class="stat" id="stat"></div>
+      </div>
       <div class="gauge g-none" id="gauge">
         <div class="dial">
-          <svg width="76" height="76" viewBox="0 0 76 76">
-            <circle class="trackring" cx="38" cy="38" r="32" />
-            <circle class="prog" id="prog" cx="38" cy="38" r="32" />
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <circle class="trackring" cx="32" cy="32" r="27" />
+            <circle class="prog" id="prog" cx="32" cy="32" r="27" />
           </svg>
           <div class="num" id="score">·</div>
         </div>
         <div class="gword" id="gword"></div>
       </div>
     </div>
-    <div class="siteline" id="siteline"></div>
     <div class="verdict" id="verdict"></div>
+    <div id="cta"></div>
     <div class="who" id="who"></div>
     <div class="story" id="story"></div>
-    <details id="details" hidden>
+    <details class="main" id="details" hidden>
       <summary>Full technical list</summary>
       <div class="list" id="list"></div>
     </details>
