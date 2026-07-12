@@ -1,10 +1,10 @@
 # Chrome Web Store listing — copy-paste sheet
 
 ## Name
-Snitch — see who's tracking you
+Snitch
 
 ## Summary (132 chars max)
-See who's tracking you on any site — trackers, fingerprinting, cookies, in plain English. 100% local. Nothing leaves your browser.
+Catch who's tracking you online. Nothing ever leaves your browser.
 
 ## Category
 Privacy & Security

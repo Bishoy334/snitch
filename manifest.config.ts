@@ -2,10 +2,9 @@ import { defineManifest } from '@crxjs/vite-plugin'
 
 export default defineManifest({
   manifest_version: 3,
-  name: "Snitch — see who's tracking you",
+  name: 'Snitch',
   version: '0.1.0',
-  description:
-    "See who's tracking you on any site — trackers, fingerprinting, cookies, in plain English. 100% local. Nothing leaves your browser.",
+  description: "Catch who's tracking you online. Nothing ever leaves your browser.",
   icons: {
     16: 'icons/icon-16.png',
     32: 'icons/icon-32.png',
