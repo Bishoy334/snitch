@@ -10,33 +10,35 @@ Catch who's tracking you online. Nothing ever leaves your browser.
 Privacy & Security
 
 ## Description
-Snitch is a privacy report card for every site you visit. Click the icon
-and get a plain-English answer to one question: what is this page doing
-with your data?
+Snitch tells you what a website is doing behind your back. Click the
+icon and you get a score, the companies that saw your visit, and a
+plain explanation of what got stored in your browser.
 
-• Who got your visit — every tracking company on the page, named and
-  scored, with real logos. Google, Meta, comScore and thousands more,
-  identified from a bundled database.
-• Fingerprinting alerts — Snitch catches pages reading hidden canvas
-  pixels, your GPU model, your audio hardware or your installed fonts:
-  the techniques that identify you even in private mode.
-• What's saved in your browser — cookies and storage classified by what
-  they mean: tracking IDs, "recognizes you when you return"
-  identifiers, and the harmless housekeeping.
-• Following you across sites — Snitch remembers (locally) which
-  companies it has seen on which sites, so it can tell you "Google has
-  seen you on 14 other sites this month."
-• A privacy score — one dial, one word, for every site.
-• Forget this site — flip a switch and Snitch wipes a site's cookies
-  and storage every time you leave it.
-• Device access alerts — know when a page asks for your camera,
-  microphone, location or clipboard.
+It catches the sneaky stuff too. If a page reads a hidden canvas, asks
+for your GPU model or scans your installed fonts, that's fingerprinting,
+and Snitch flags it as it happens. Same if a page wants your camera,
+microphone, location or clipboard.
 
-100% local. Snitch has no server, no account, no analytics, and makes no
-network requests. Everything is computed on your device against a
-bundled tracker database. The permission list is broad because the job
-is broad — inspecting any page you're on — but nothing ever leaves your
-browser. That's the whole point.
+Snitch also remembers which trackers it has seen on which sites (only
+on your device), so it can tell you things like "Google has seen you on
+14 other sites this month". That's the part that made me want to build
+this.
+
+What you get for every site:
+
+- a privacy score with a one line verdict
+- every tracking company on the page, with names and logos
+- fingerprinting attempts, caught in the act
+- which cookies are tracking IDs and which are just logins and settings
+- a "forget this site" switch that wipes a site's data whenever you
+  leave it
+
+Everything runs in your browser. Snitch has no server, no account, no
+analytics, and it makes zero network requests. Your data would be a
+strange thing for a privacy extension to collect.
+
+It's free. If it's useful to you, there's a Buy me a coffee link in the
+popup.
 
 ## Single-purpose statement (privacy tab)
 Snitch shows the user, for the site they are currently visiting, which
