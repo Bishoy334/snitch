@@ -6,6 +6,14 @@ type TabReport = {
   site: string
   siteCompany: string | null
   requests: Record<string, { count: number; tracker: Tracker | null }>
+  fingerprinting?: { kind: string; host: string }[]
+}
+
+const FP_LABELS: Record<string, string> = {
+  canvas: 'Read pixels from a hidden canvas',
+  webgl: 'Asked WebGL for your GPU model',
+  audio: 'Probed your audio stack',
+  fonts: 'Scanned your installed fonts',
 }
 
 // ponytail: v1 score = flat per-domain penalty by category; tune when real-site
@@ -79,9 +87,12 @@ if (!report) {
   const own = entries.filter((e) => e.tracker && e.tracker.company === report.siteCompany)
   const other = entries.filter((e) => !tracking.includes(e) && !own.includes(e))
 
+  const fp = report.fingerprinting ?? []
+  const fpKinds = new Set(fp.map((f) => f.kind)).size
   const penalty =
     tracking.reduce((sum, e) => sum + (WEIGHTS[e.tracker!.category] ?? 5), 0) +
-    Math.min(other.length, 10)
+    Math.min(other.length, 10) +
+    Math.min(fpKinds * 20, 40)
   const score = Math.max(0, 100 - penalty)
   const grade = gradeOf(score)
 
@@ -106,6 +117,26 @@ if (!report) {
     if (tracking.some((e) => e.tracker!.category.startsWith('Fingerprinting')))
       text += ' Includes a known fingerprinter.'
     $('why').textContent = text
+  }
+  if (fp.length) $('why').textContent += ' It also tried to fingerprint your device.'
+
+  if (fp.length) {
+    const sec = document.createElement('div')
+    sec.className = 'sec'
+    sec.textContent = 'Fingerprinting'
+    $('list').append(sec)
+    for (const f of fp) {
+      const div = document.createElement('div')
+      div.className = 'row'
+      const label = document.createElement('span')
+      label.className = 'host'
+      label.textContent = FP_LABELS[f.kind] ?? f.kind
+      const chip = document.createElement('span')
+      chip.className = 'chip hot'
+      chip.textContent = f.host && f.host !== report.site ? `by ${f.host}` : ''
+      div.append(label, chip)
+      $('list').append(div)
+    }
   }
 
   section('Trackers', tracking, true)

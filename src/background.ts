@@ -6,6 +6,7 @@ type TabReport = {
   site: string
   siteCompany: string | null
   requests: Record<string, { count: number; tracker: Tracker | null }>
+  fingerprinting: { kind: string; host: string }[]
 }
 
 const db = trackerDb as Record<string, Tracker>
@@ -25,6 +26,10 @@ function lookupTracker(host: string): Tracker | null {
   return null
 }
 
+function newReport(site: string): TabReport {
+  return { site, siteCompany: lookupTracker(site)?.company ?? null, requests: {}, fingerprinting: [] }
+}
+
 function save(tabId: number) {
   chrome.storage.session.set({ [`tab-${tabId}`]: reports.get(tabId) })
 }
@@ -34,7 +39,7 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (tabId < 0) return
     const host = new URL(url).hostname
     if (type === 'main_frame') {
-      reports.set(tabId, { site: host, siteCompany: lookupTracker(host)?.company ?? null, requests: {} })
+      reports.set(tabId, newReport(host))
       save(tabId)
       return
     }
@@ -46,6 +51,26 @@ chrome.webRequest.onBeforeRequest.addListener(
   },
   { urls: ['<all_urls>'] },
 )
+
+chrome.runtime.onMessage.addListener((msg: { fp?: string; host?: string }, sender) => {
+  const tabId = sender.tab?.id
+  if (!msg?.fp || tabId === undefined || tabId < 0) return
+  let report = reports.get(tabId)
+  if (!report) {
+    // tab predates the extension (or SW restarted): start a report from the tab's URL
+    let site = ''
+    try {
+      site = new URL(sender.tab!.url ?? '').hostname
+    } catch {}
+    report = newReport(site)
+    reports.set(tabId, report)
+  }
+  const host = msg.host ?? ''
+  if (!report.fingerprinting.some((f) => f.kind === msg.fp && f.host === host)) {
+    report.fingerprinting.push({ kind: msg.fp, host })
+    save(tabId)
+  }
+})
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   reports.delete(tabId)
