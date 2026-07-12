@@ -212,8 +212,13 @@
 
       .empty { padding: 6px 16px 16px; color: var(--muted); }
       .foot { border-top: 1px solid var(--hair); padding: 9px 16px; text-align: center; }
-      .foot a { color: var(--muted); font-size: 11.5px; text-decoration: none; }
-      .foot a:hover { color: var(--ink); }
+      .foot a {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: var(--muted); font-size: 11.5px; text-decoration: none;
+        opacity: 0.85; transition: opacity 0.15s ease;
+      }
+      .foot a:hover { color: var(--ink); opacity: 1; }
+      .foot img { width: 14px; height: 14px; border-radius: 4px; }
     </style>
   </head>
   <body>
@@ -243,7 +248,9 @@
       <div class="list" id="list"></div>
     </details>
     <div class="foot">
-      <a href="https://buymeacoffee.com/bishoymichail" target="_blank" rel="noreferrer">☕ Enjoying this? Buy me a coffee</a>
+      <a href="https://buymeacoffee.com/bishoymichail" target="_blank" rel="noreferrer"
+        ><img src="../icons/bmc.png" alt="" /> Buy me a coffee</a
+      >
     </div>
     <script type="module" src="./main.ts"></script>
   </body>
