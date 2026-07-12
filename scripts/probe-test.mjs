@@ -1,5 +1,6 @@
 // Self-check for page-probe.ts: run(page, builtProbeCode) on a fresh Playwright page.
-// Expects { afterNegative: 0, hits: ['canvas','webgl','audio','fonts'] } — one hit per vector.
+// Expects { afterNegative: 0 } and one hit per vector: canvas, webgl, audio, fonts,
+// plus mic, camera, geolocation, clipboard when run on a secure-context page (https).
 export default async function run(page, probeCode) {
   return await page.evaluate(async (code) => {
     const hits = []
@@ -31,6 +32,11 @@ export default async function run(page, probeCode) {
     // fonts
     const ctx = attached.getContext('2d')
     for (let i = 0; i < 25; i++) { ctx.font = `12px font${i}`; ctx.measureText('x') }
+
+    // sensitive APIs: hooks fire even when the underlying call is denied
+    if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() => {})
+    navigator.geolocation.getCurrentPosition(() => {}, () => {})
+    if (navigator.clipboard?.readText) navigator.clipboard.readText().catch(() => {})
 
     // dedupe: second detached readout should add nothing
     detached.toDataURL()

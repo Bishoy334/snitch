@@ -1,4 +1,4 @@
-export {}
+import { getDomain } from 'tldts'
 
 type Tracker = { company: string; category: string }
 type Entry = { host: string; count: number; tracker: Tracker | null }
@@ -14,6 +14,12 @@ const FP_LABELS: Record<string, string> = {
   webgl: 'Asked WebGL for your GPU model',
   audio: 'Probed your audio stack',
   fonts: 'Scanned your installed fonts',
+}
+const API_LABELS: Record<string, string> = {
+  mic: 'Asked for your microphone',
+  camera: 'Asked for your camera',
+  geolocation: 'Asked for your location',
+  clipboard: 'Read your clipboard',
 }
 
 // ponytail: v1 score = flat per-domain penalty by category; tune when real-site
@@ -40,32 +46,43 @@ function gradeOf(score: number): string {
   return score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'F'
 }
 
-function row(e: Entry, hot: boolean): HTMLElement {
+function makeRow(label: string, chipText: string, hot: boolean, count?: number): HTMLElement {
   const div = document.createElement('div')
   div.className = 'row'
   const host = document.createElement('span')
   host.className = 'host'
-  host.textContent = e.host
+  host.textContent = label
   div.append(host)
-  if (e.tracker) {
+  if (chipText) {
     const chip = document.createElement('span')
     chip.className = hot ? 'chip hot' : 'chip'
-    chip.textContent = `${e.tracker.company} · ${niceCat(e.tracker.category)}`
+    chip.textContent = chipText
     div.append(chip)
   }
-  const count = document.createElement('span')
-  count.className = 'count'
-  count.textContent = String(e.count)
-  div.append(count)
+  if (count !== undefined) {
+    const c = document.createElement('span')
+    c.className = 'count'
+    c.textContent = String(count)
+    div.append(c)
+  }
   return div
+}
+
+function row(e: Entry, hot: boolean): HTMLElement {
+  const chip = e.tracker ? `${e.tracker.company} · ${niceCat(e.tracker.category)}` : ''
+  return makeRow(e.host, chip, hot, e.count)
+}
+
+function sectionTitle(title: string): HTMLElement {
+  const sec = document.createElement('div')
+  sec.className = 'sec'
+  sec.textContent = title
+  return sec
 }
 
 function section(title: string, entries: Entry[], hot: boolean) {
   if (!entries.length) return
-  const sec = document.createElement('div')
-  sec.className = 'sec'
-  sec.textContent = title
-  $('list').append(sec, ...entries.map((e) => row(e, hot)))
+  $('list').append(sectionTitle(title), ...entries.map((e) => row(e, hot)))
 }
 
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -87,7 +104,9 @@ if (!report) {
   const own = entries.filter((e) => e.tracker && e.tracker.company === report.siteCompany)
   const other = entries.filter((e) => !tracking.includes(e) && !own.includes(e))
 
-  const fp = report.fingerprinting ?? []
+  const signals = report.fingerprinting ?? []
+  const fp = signals.filter((f) => f.kind in FP_LABELS)
+  const device = signals.filter((f) => f.kind in API_LABELS)
   const fpKinds = new Set(fp.map((f) => f.kind)).size
   const penalty =
     tracking.reduce((sum, e) => sum + (WEIGHTS[e.tracker!.category] ?? 5), 0) +
@@ -120,23 +139,17 @@ if (!report) {
   }
   if (fp.length) $('why').textContent += ' It also tried to fingerprint your device.'
 
-  if (fp.length) {
-    const sec = document.createElement('div')
-    sec.className = 'sec'
-    sec.textContent = 'Fingerprinting'
-    $('list').append(sec)
-    for (const f of fp) {
-      const div = document.createElement('div')
-      div.className = 'row'
-      const label = document.createElement('span')
-      label.className = 'host'
-      label.textContent = FP_LABELS[f.kind] ?? f.kind
-      const chip = document.createElement('span')
-      chip.className = 'chip hot'
-      chip.textContent = f.host && f.host !== report.site ? `by ${f.host}` : ''
-      div.append(label, chip)
-      $('list').append(div)
-    }
+  for (const [title, list, labels] of [
+    ['Fingerprinting', fp, FP_LABELS],
+    ['Device access', device, API_LABELS],
+  ] as const) {
+    if (!list.length) continue
+    $('list').append(
+      sectionTitle(title),
+      ...list.map((f) =>
+        makeRow(labels[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : '', true),
+      ),
+    )
   }
 
   section('Trackers', tracking, true)
@@ -148,5 +161,31 @@ if (!report) {
     empty.className = 'empty'
     empty.textContent = 'No third-party requests on this page.'
     $('list').append(empty)
+  }
+
+  // cookies & storage, queried live when the popup opens
+  const siteDomain = getDomain(report.site)
+  if (siteDomain) {
+    const trackedDomains = [...new Set(tracking.map((e) => getDomain(e.host)))].filter(
+      (d): d is string => !!d,
+    )
+    const [siteCookies, storage, ...trackerCookies] = await Promise.all([
+      chrome.cookies.getAll({ domain: siteDomain }),
+      chrome.tabs
+        .sendMessage(tab.id!, { audit: true }, { frameId: 0 })
+        .catch(() => null) as Promise<{ local: number; session: number } | null>,
+      ...trackedDomains.map((d) => chrome.cookies.getAll({ domain: d })),
+    ])
+
+    const persistent = siteCookies.filter((c) => c.expirationDate).length
+    const rows = [makeRow(`Set by ${siteDomain}`, `${persistent} persistent`, false, siteCookies.length)]
+    trackedDomains
+      .map((d, i) => [d, trackerCookies[i].length] as const)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .forEach(([d, n]) => rows.push(makeRow(d, 'cookies on you', true, n)))
+    if (storage) rows.push(makeRow('Local storage', `${storage.session} session`, false, storage.local))
+    $('list').append(sectionTitle('Cookies & storage'), ...rows)
   }
 }

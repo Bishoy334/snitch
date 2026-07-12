@@ -11,6 +11,6 @@ export default defineManifest({
     { js: ['src/content.ts'], matches: ['<all_urls>'], run_at: 'document_start', all_frames: true },
     { js: ['src/page-probe.ts'], matches: ['<all_urls>'], run_at: 'document_start', all_frames: true, world: 'MAIN' },
   ],
-  permissions: ['webRequest', 'storage'],
+  permissions: ['webRequest', 'storage', 'cookies'],
   host_permissions: ['<all_urls>'],
 })

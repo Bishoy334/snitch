@@ -69,3 +69,32 @@ if (window.FontFaceSet) {
     return check.call(this, font, text)
   }
 }
+
+// sensitive-API access: mic/camera/location/clipboard-read attempts
+if (window.MediaDevices) {
+  const getUserMedia = MediaDevices.prototype.getUserMedia
+  MediaDevices.prototype.getUserMedia = function (c?: MediaStreamConstraints) {
+    if (c?.audio) report('mic')
+    if (c?.video) report('camera')
+    return getUserMedia.call(this, c)
+  }
+}
+if (window.Geolocation) {
+  for (const m of ['getCurrentPosition', 'watchPosition'] as const) {
+    const orig = Geolocation.prototype[m] as (...a: unknown[]) => unknown
+    ;(Geolocation.prototype as any)[m] = function (...args: unknown[]) {
+      report('geolocation')
+      return orig.apply(this, args)
+    }
+  }
+}
+if (window.Clipboard) {
+  for (const m of ['read', 'readText'] as const) {
+    const orig = (Clipboard.prototype as any)[m]
+    if (!orig) continue
+    ;(Clipboard.prototype as any)[m] = function (...args: unknown[]) {
+      report('clipboard')
+      return orig.apply(this, args)
+    }
+  }
+}
