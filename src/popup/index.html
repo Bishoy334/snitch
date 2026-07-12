@@ -32,20 +32,44 @@
         background: var(--bg); color: var(--ink);
         width: 360px; margin: 0;
       }
-      header { display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px; }
-      .seal {
-        width: 46px; height: 46px; flex-shrink: 0;
-        border-radius: 10px; border: 1.5px solid currentColor;
-        display: grid; place-items: center;
-        font: 700 26px/1 Georgia, 'Iowan Old Style', serif;
-        background: color-mix(in srgb, currentColor 12%, transparent);
-      }
       .g-A { color: var(--g-a); } .g-B { color: var(--g-b); } .g-C { color: var(--g-c); }
       .g-D { color: var(--g-d); } .g-F { color: var(--g-f); } .g-none { color: var(--muted); }
-      .head-text { min-width: 0; }
-      .site { font-weight: 650; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .sub { color: var(--muted); font-size: 12px; }
-      .verdict { padding: 2px 16px 10px; }
+
+      .hero { display: flex; gap: 14px; padding: 14px 16px 8px; align-items: center; }
+      .shot {
+        flex: 1; min-width: 0; aspect-ratio: 16 / 10;
+        border-radius: 10px; border: 1px solid var(--hair); overflow: hidden;
+        display: grid; place-items: center; position: relative;
+        background: var(--chipbg);
+      }
+      .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+      .shot .letter {
+        font: 700 30px Georgia, 'Iowan Old Style', serif; color: #fff;
+        width: 100%; height: 100%; display: grid; place-items: center;
+      }
+      .gauge { flex-shrink: 0; width: 80px; text-align: center; }
+      .dial { position: relative; width: 76px; height: 76px; margin: 0 auto; }
+      .dial svg { display: block; }
+      .dial .trackring { fill: none; stroke: var(--hair); stroke-width: 7; }
+      .dial .prog {
+        fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round;
+        stroke-dasharray: 201; stroke-dashoffset: 201;
+        transform: rotate(-90deg); transform-origin: center;
+        transition: stroke-dashoffset 0.6s ease;
+      }
+      @media (prefers-reduced-motion: reduce) { .dial .prog { transition: none; } }
+      .dial .num {
+        position: absolute; inset: 0; display: grid; place-items: center;
+        font-weight: 700; font-size: 21px; color: var(--ink);
+      }
+      .gword { font-size: 11px; font-weight: 650; margin-top: 3px; }
+
+      .siteline {
+        padding: 0 16px 8px; color: var(--muted); font-size: 12px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .siteline b { color: var(--ink); font-size: 13px; }
+      .verdict { padding: 0 16px 10px; }
       .who { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
       .who:empty { display: none; }
       .pill {
@@ -59,13 +83,21 @@
         font-size: 11px; font-weight: 700; color: #fff;
       }
       .more { color: var(--muted); align-self: center; font-size: 12px; padding-left: 2px; }
-      .story { border-top: 1px solid var(--hair); padding: 8px 16px 10px; }
+
+      .story { border-top: 1px solid var(--hair); padding: 10px 16px; display: grid; gap: 9px; }
       .story:empty { display: none; }
-      .item { display: flex; gap: 10px; padding: 6px 0; }
-      .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-      .dot-b { background: var(--bad); } .dot-w { background: var(--warn); } .dot-g { background: var(--ok); }
+      .item { display: flex; gap: 10px; align-items: flex-start; }
+      .ico {
+        width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px;
+        display: grid; place-items: center;
+        background: color-mix(in srgb, currentColor 13%, transparent);
+      }
+      .ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .ico-b { color: var(--bad); } .ico-w { color: var(--warn); } .ico-g { color: var(--ok); }
+      .item .txt { padding-top: 2px; }
       .item b { font-weight: 650; }
       .item .note { color: var(--muted); font-size: 12px; }
+
       details { border-top: 1px solid var(--hair); }
       summary {
         list-style: none; cursor: pointer;
@@ -75,7 +107,7 @@
       summary::-webkit-details-marker { display: none; }
       summary::after { content: '▾'; }
       details[open] summary::after { content: '▴'; }
-      .list { max-height: 330px; overflow-y: auto; padding-bottom: 6px; }
+      .list { max-height: 300px; overflow-y: auto; padding-bottom: 6px; }
       .sec {
         padding: 9px 16px 3px;
         font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
@@ -90,13 +122,20 @@
     </style>
   </head>
   <body>
-    <header>
-      <div class="seal g-none" id="seal">·</div>
-      <div class="head-text">
-        <div class="site" id="site"></div>
-        <div class="sub" id="sub"></div>
+    <div class="hero">
+      <div class="shot" id="shot"></div>
+      <div class="gauge g-none" id="gauge">
+        <div class="dial">
+          <svg width="76" height="76" viewBox="0 0 76 76">
+            <circle class="trackring" cx="38" cy="38" r="32" />
+            <circle class="prog" id="prog" cx="38" cy="38" r="32" />
+          </svg>
+          <div class="num" id="score">·</div>
+        </div>
+        <div class="gword" id="gword"></div>
       </div>
-    </header>
+    </div>
+    <div class="siteline" id="siteline"></div>
     <div class="verdict" id="verdict"></div>
     <div class="who" id="who"></div>
     <div class="story" id="story"></div>

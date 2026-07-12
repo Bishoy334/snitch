@@ -51,6 +51,14 @@ const API_PHRASES: Record<string, string> = {
   geolocation: 'your location',
 }
 
+const ICONS: Record<string, string> = {
+  eye: '<path d="M1.5 8s2.6-4.8 6.5-4.8S14.5 8 14.5 8s-2.6 4.8-6.5 4.8S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2.1"/>',
+  fp: '<path d="M8 3.2a5 5 0 0 1 5 5c0 1.6-.2 3-.6 4.2"/><path d="M8 5.8A2.4 2.4 0 0 1 10.4 8.2c0 1.7-.3 3.2-.9 4.6"/><path d="M5.4 4.4A5 5 0 0 0 3 8.2c0 1.5.2 2.8.6 3.9"/><path d="M7.9 8.3c0 1.9-.4 3.5-1 4.7"/>',
+  cookie: '<circle cx="8" cy="8" r="5.8"/><circle cx="6" cy="6.3" r="0.4"/><circle cx="9.6" cy="5.9" r="0.4"/><circle cx="10" cy="9.6" r="0.4"/><circle cx="6.4" cy="9.9" r="0.4"/>',
+  radar: '<circle cx="8" cy="9.8" r="1.5"/><path d="M4.8 6.6a4.6 4.6 0 0 1 6.4 0"/><path d="M2.8 4.4a7.4 7.4 0 0 1 10.4 0"/>',
+  shield: '<path d="M8 1.8l5 1.9v4.1c0 3.4-2.1 5.4-5 6.4-2.9-1-5-3-5-6.4V3.7z"/><path d="M5.8 8l1.6 1.6 2.8-3"/>',
+}
+
 const BRAND: Record<string, string> = {
   Google: '#4285f4',
   Meta: '#0866ff',
@@ -98,22 +106,20 @@ function span(seconds: number): string {
   return 'a day'
 }
 
-function gradeOf(score: number): string {
-  return score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'F'
-}
-
 function verdictLine(...parts: (string | HTMLElement)[]) {
   $('verdict').append(...parts)
 }
 const bold = (t: string) => el('b', '', t)
 
-function story(sev: 'b' | 'w' | 'g', head: string, note?: string) {
+function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string) {
   const item = el('div', 'item')
-  item.append(el('span', `dot dot-${sev}`))
-  const body = el('div', '')
-  body.append(el('b', '', head))
-  if (note) body.append(el('div', 'note', note))
-  item.append(body)
+  const ico = el('span', `ico ico-${sev}`)
+  ico.innerHTML = `<svg viewBox="0 0 16 16">${ICONS[icon]}</svg>`
+  item.append(ico)
+  const txt = el('div', 'txt')
+  txt.append(el('b', '', head))
+  if (note) txt.append(el('div', 'note', note))
+  item.append(txt)
   $('story').append(item)
 }
 
@@ -130,13 +136,52 @@ function section(title: string, rows: HTMLElement[]) {
   $('list').append(el('div', 'sec', title), ...rows)
 }
 
+function sitePhoto(site: string) {
+  chrome.tabs
+    .captureVisibleTab({ format: 'jpeg', quality: 60 })
+    .then((url) => {
+      const img = document.createElement('img')
+      img.src = url
+      img.alt = ''
+      $('shot').append(img)
+    })
+    .catch(() => {
+      const letter = el('div', 'letter', (site[0] ?? '?').toUpperCase())
+      letter.style.background = `linear-gradient(135deg, ${brandColor(site)}, color-mix(in srgb, ${brandColor(site)} 55%, #000))`
+      $('shot').append(letter)
+    })
+}
+
+function setDial(score: number | null) {
+  const gauge = $('gauge')
+  if (score === null) {
+    $('score').textContent = '·'
+    $('gword').textContent = 'Not inspected'
+    return
+  }
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'F'
+  const words: Record<string, string> = { A: 'Excellent', B: 'Good', C: 'Okay', D: 'Poor', F: 'Awful' }
+  gauge.className = `gauge g-${grade}`
+  $('score').textContent = String(score)
+  $('gword').textContent = words[grade]
+  const CIRC = 201
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      ;($('prog') as unknown as SVGCircleElement).style.strokeDashoffset = String(CIRC * (1 - score / 100))
+    }),
+  )
+}
+
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
 const key = `tab-${tab.id}`
 const report = (await chrome.storage.session.get(key))[key] as TabReport | undefined
+const tabHost = tab.url ? new URL(tab.url).hostname : ''
+
+sitePhoto(report?.site || tabHost)
 
 if (!report) {
-  $('site').textContent = tab.url ? new URL(tab.url).hostname || tab.url : ''
-  $('sub').textContent = 'Not inspected yet'
+  setDial(null)
+  $('siteline').append(bold(tabHost || tab.url || ''))
   verdictLine('Reload the page and this report fills in.')
 } else {
   const entries: Entry[] = Object.entries(report.requests)
@@ -185,20 +230,19 @@ if (!report) {
     Math.min(other.length, 10) +
     Math.min(fpKinds.length * 20, 40)
   const score = Math.max(0, 100 - penalty)
-  const grade = gradeOf(score)
-  const seal = $('seal')
-  seal.textContent = grade
-  seal.className = `seal g-${grade}`
+  setDial(score)
 
-  // header
-  $('site').textContent = report.site
+  // site line
   const byCompany = new Map<string, number>()
   for (const e of tracking)
     byCompany.set(e.tracker!.company, (byCompany.get(e.tracker!.company) ?? 0) + e.count)
   const companies = [...byCompany.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => displayName(name))
-  $('sub').textContent = tracking.length
-    ? `${tracking.length} tracker${tracking.length > 1 ? 's' : ''} from ${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`
-    : 'No known trackers'
+  $('siteline').append(
+    bold(report.site),
+    tracking.length
+      ? ` · ${tracking.length} tracker${tracking.length > 1 ? 's' : ''} from ${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`
+      : ' · no known trackers',
+  )
 
   // verdict
   if (tracking.length && fpKinds.length) {
@@ -245,14 +289,15 @@ if (!report) {
       : cats.has('Social')
         ? 'Their embeds report your visit whether or not you touch them.'
         : 'They log what you do here and report it back.'
-    story('b', head, note)
+    story('b', 'eye', head, note)
   }
 
   if (fpKinds.length) {
     story(
       'b',
+      'fp',
       'Tried to fingerprint your device.',
-      `Checked ${joinHuman(fpKinds.map((k) => FP_PHRASES[k]))}. Sites use that to recognize you without cookies, even in private mode.`,
+      `Checked ${joinHuman(fpKinds.map((k) => FP_PHRASES[k]))}. That works even in private mode.`,
     )
   }
 
@@ -260,24 +305,23 @@ if (!report) {
     const head =
       cookieHolders.length === 1
         ? `${cookieHolders[0].domain} left cookies that last ${span(longestLife)}.`
-        : `${cookieHolders.length} trackers left cookies here. The longest lasts ${span(longestLife)}.`
-    story('w', head, 'Cookies let them recognize you when you come back.')
+        : `${cookieHolders.length} trackers left cookies that last up to ${span(longestLife)}.`
+    story('w', 'cookie', head)
   }
 
   const asked = [...new Set(device.map((d) => d.kind))].filter((k) => k in API_PHRASES)
-  if (asked.length)
-    story('b', `Asked for ${joinHuman(asked.map((k) => API_PHRASES[k]))}.`)
-  if (device.some((d) => d.kind === 'clipboard')) story('b', 'Read your clipboard.')
+  if (asked.length) story('b', 'radar', `Asked for ${joinHuman(asked.map((k) => API_PHRASES[k]))}.`)
+  if (device.some((d) => d.kind === 'clipboard')) story('b', 'radar', 'Read your clipboard.')
 
   // one true reassurance line
   if (!tracking.length && !fpKinds.length && !device.length && !entries.length) {
-    story('g', 'No third parties, no trackers, no snooping.')
+    story('g', 'shield', 'No third parties, no trackers, no snooping.')
   } else if (!fpKinds.length && !device.length) {
-    story('g', 'No fingerprinting, and it never asked for your camera, mic or location.')
+    story('g', 'shield', 'No fingerprinting, and it never asked for your camera, mic or location.')
   } else if (!device.length) {
-    story('g', 'Never asked for your camera, mic or location.')
+    story('g', 'shield', 'Never asked for your camera, mic or location.')
   } else if (!fpKinds.length) {
-    story('g', 'No device fingerprinting detected.')
+    story('g', 'shield', 'No device fingerprinting detected.')
   }
 
   // full technical list
