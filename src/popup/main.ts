@@ -157,14 +157,31 @@ function favicon(url: string | undefined, site: string) {
   }
 }
 
-function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string) {
+function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string, tip?: string) {
   const item = el('div', 'item')
   const ico = el('span', `ico ico-${sev}`)
   ico.innerHTML = `<svg viewBox="0 0 16 16">${ICONS[icon]}</svg>`
   item.append(ico)
   const txt = el('div', 'txt')
-  txt.append(el('b', '', head))
-  if (note) txt.append(el('div', 'note', note))
+  const head_ = el('span', '')
+  head_.append(el('b', '', head))
+  if (tip) {
+    const btn = el('button', 'info', 'i') as HTMLButtonElement
+    btn.setAttribute('aria-label', 'More about this')
+    const tipEl = el('div', 'note', tip)
+    tipEl.hidden = true
+    btn.addEventListener('click', () => {
+      tipEl.hidden = !tipEl.hidden
+      btn.classList.toggle('on', !tipEl.hidden)
+    })
+    head_.append(btn)
+    txt.append(head_)
+    if (note) txt.append(el('div', 'note', note))
+    txt.append(tipEl)
+  } else {
+    txt.append(head_)
+    if (note) txt.append(el('div', 'note', note))
+  }
   item.append(txt)
   $('story').append(item)
 }
@@ -374,7 +391,8 @@ if (restricted) {
       'b',
       'fp',
       'Tried to fingerprint your device.',
-      `Checked ${joinHuman(fpKinds.map((k) => FP_PHRASES[k]))}. That works even in private mode.`,
+      `Checked ${joinHuman(fpKinds.map((k) => FP_PHRASES[k]))}.`,
+      "A fingerprint identifies your device without cookies, even in private mode. Clearing cookies won't stop it.",
     )
   }
 
@@ -468,7 +486,7 @@ if (restricted) {
     quietCards.push(
       card({
         name: `${displayName(report.siteCompany ?? brand ?? report.site)}'s own services`,
-        catText: 'same owner as this site',
+        catText: 'same owner',
         requests: own.reduce((s, e) => s + e.count, 0),
         hosts: own.map((e) => ({ label: e.host, count: e.count })),
       }),
@@ -515,7 +533,7 @@ if (restricted) {
     savedRows.push(
       savedRow(
         `${who} can spot you on other sites`,
-        `its cookie here rides along wherever it runs${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
+        `its cookie travels with you${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
         'b',
       ),
     )
@@ -535,16 +553,10 @@ if (restricted) {
   }
   const idCount = lookalikes + (storage?.ids ?? 0)
   if (idCount) {
-    const where = [
-      lookalikes ? `${lookalikes} cookie${lookalikes > 1 ? 's' : ''}` : '',
-      storage?.ids ? `${storage.ids} in local storage` : '',
-    ]
-      .filter(Boolean)
-      .join(', ')
     savedRows.push(
       savedRow(
         `${siteName} can recognize you when you come back`,
-        `${idCount} saved identifier${idCount > 1 ? 's' : ''} (${where}), even if you log out`,
+        `${idCount} saved identifier${idCount > 1 ? 's' : ''} · still there if you log out`,
         'w',
       ),
     )
@@ -554,7 +566,7 @@ if (restricted) {
     const parts = []
     if (ordinary) parts.push(`${ordinary} cookie${ordinary > 1 ? 's' : ''}`)
     if (boringStore) parts.push(`${boringStore} storage item${boringStore > 1 ? 's' : ''}`)
-    savedRows.push(savedRow('The rest is housekeeping', `${parts.join(' and ')} for logins, settings, cache`))
+    savedRows.push(savedRow('The rest is housekeeping', parts.join(' · ')))
   }
   if (savedRows.length) list.append(sec('Saved in your browser'), ...savedRows)
 
@@ -576,17 +588,13 @@ if (restricted) {
       f.append(
         bold(name),
         ` has seen you on ${others} other site${others > 1 ? 's' : ''} recently`,
-        hasIdCookie.has(name) ? ', and holds an ID cookie that connects those visits.' : '.',
+        hasIdCookie.has(name) ? '. An ID cookie connects them.' : '.',
       )
     } else {
-      f.append(bold(name), ' has only seen you here so far. If it appears on other sites you visit, it can connect them.')
+      f.append(bold(name), ' has only seen you here so far.')
     }
     follow.push(f)
   }
-  if (fpKinds.length)
-    follow.push(
-      el('div', 'fact', "A fingerprint identifies your device without cookies. Clearing them won't stop it."),
-    )
   if (!follow.length) follow.push(el('div', 'fact good', 'No one on this page tracks you across sites.'))
   list.append(sec('Following you across sites'))
   const wrap = el('div', 'facts')
