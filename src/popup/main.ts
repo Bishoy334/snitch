@@ -1,4 +1,12 @@
 import { getDomain, getDomainWithoutSuffix } from 'tldts'
+import brands from '../icons/brands.json'
+
+// bundled logos for well-known tracker companies; everyone else gets a monogram
+const brandIcons = import.meta.glob('../icons/brands/*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
 
 type Tracker = { company: string; category: string }
 type Entry = { host: string; count: number; tracker: Tracker | null }
@@ -137,6 +145,15 @@ function verdictLine(...parts: (string | HTMLElement)[]) {
 const bold = (t: string) => el('b', '', t)
 
 function monogram(cls: string, name: string): HTMLElement {
+  const file = (brands as Record<string, string>)[name]
+  const url = file ? brandIcons[`../icons/brands/${file}`] : undefined
+  if (url) {
+    const img = document.createElement('img')
+    img.className = `${cls} mono-img`
+    img.src = url
+    img.alt = ''
+    return img
+  }
   const m = el('span', cls, (name[0] ?? '?').toUpperCase())
   m.style.background = brandColor(name)
   return m
@@ -146,7 +163,7 @@ function favicon(url: string | undefined, site: string) {
   if (url && /^https?:/.test(url)) {
     const img = document.createElement('img')
     img.alt = ''
-    img.src = chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`)
+    img.src = chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`)
     img.onerror = () => {
       img.remove()
       $('fav').append(monogram('letter', site))
