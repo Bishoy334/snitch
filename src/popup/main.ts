@@ -312,13 +312,35 @@ if (restricted) {
     ...cookieHolders.flatMap((h) => h.cookies.map((c) => (c.expirationDate ?? now) - now)),
   )
 
-  // score
-  const penalty =
-    tracking.reduce((sum, e) => sum + (WEIGHTS[e.tracker!.category] ?? 5), 0) +
-    Math.min(content.length + unknown.length, 10) +
-    Math.min(fpKinds.length * 20, 40)
-  const score = Math.max(0, 100 - penalty)
+  // score, kept as named parts so the dial can explain itself
+  const trackerPts = tracking.reduce((sum, e) => sum + (WEIGHTS[e.tracker!.category] ?? 5), 0)
+  const otherPts = Math.min(content.length + unknown.length, 10)
+  const fpPts = Math.min(fpKinds.length * 20, 40)
+  const score = Math.max(0, 100 - trackerPts - otherPts - fpPts)
   setDial(score)
+
+  // click the dial to see how the score was built
+  const why = $('scorewhy')
+  const wrow = (label: string, pts: string) => {
+    const r = el('div', 'wrow')
+    r.append(el('span', '', label), el('span', 'pts', pts))
+    return r
+  }
+  why.append(wrow('Every site starts at', '100'))
+  if (trackerPts) why.append(wrow(`${tracking.length} tracker${tracking.length > 1 ? 's' : ''}`, `−${trackerPts}`))
+  if (fpPts) why.append(wrow('fingerprinting attempt', `−${fpPts}`))
+  if (otherPts) why.append(wrow(`${content.length + unknown.length} unclassified third parties`, `−${otherPts}`))
+  if (!trackerPts && !fpPts && !otherPts) why.append(wrow('nothing to penalize', ''))
+  const gauge = $('gauge')
+  gauge.title = 'How this score was calculated'
+  gauge.tabIndex = 0
+  const toggleWhy = () => {
+    why.hidden = !why.hidden
+  }
+  gauge.addEventListener('click', toggleWhy)
+  gauge.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') toggleWhy()
+  })
 
   // hero text
   const byCompany = new Map<string, { total: number; cats: Set<string>; hosts: Entry[] }>()
@@ -413,6 +435,33 @@ if (restricted) {
     story('g', 'shield', 'Never asked for your camera, mic or location.')
   } else if (!fpKinds.length) {
     story('g', 'shield', 'No device fingerprinting detected.')
+  }
+
+  // the one action: wipe what this page (and its trackers) stored
+  if (siteCookies.length || cookieHolders.length || (storage?.local ?? 0) > 0) {
+    const btn = el('button', '', 'Clear what this page left behind') as HTMLButtonElement
+    let cleared = false
+    btn.addEventListener('click', async () => {
+      if (cleared) {
+        chrome.tabs.reload(tab.id!)
+        window.close()
+        return
+      }
+      btn.disabled = true
+      btn.textContent = 'Clearing…'
+      const origins: [string, ...string[]] = [
+        new URL(tabUrl).origin,
+        ...cookieHolders.map((h) => `https://${h.domain}`),
+      ]
+      await chrome.browsingData.remove(
+        { origins },
+        { cookies: true, localStorage: true, indexedDB: true, cacheStorage: true },
+      )
+      cleared = true
+      btn.disabled = false
+      btn.textContent = 'Cleared. Reload page'
+    })
+    $('cta').append(btn)
   }
 
   // Level 2: where your data goes
