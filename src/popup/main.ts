@@ -8,7 +8,7 @@ const brandIcons = import.meta.glob('../icons/brands/*.png', {
   import: 'default',
 }) as Record<string, string>
 
-type Tracker = { company: string; category: string }
+type Tracker = { company: string; category: string; url?: string }
 type Entry = { host: string; count: number; tracker: Tracker | null }
 type TabReport = {
   site: string
@@ -215,6 +215,7 @@ function card(opts: {
   catText?: string
   requests?: number
   subs?: string[]
+  detail?: HTMLElement[]
   hosts: { label: string; count?: number }[]
 }): HTMLElement {
   const d = document.createElement('details')
@@ -236,6 +237,7 @@ function card(opts: {
   for (const sub of opts.subs ?? []) s.append(el('div', 'csub', sub))
   d.append(s)
   const hosts = el('div', 'hosts')
+  hosts.append(...(opts.detail ?? []))
   for (const h of opts.hosts) hosts.append(makeRow(h.label, '', h.count))
   d.append(hosts)
   return d
@@ -383,10 +385,21 @@ if (restricted) {
     verdictLine('This page kept everything to itself.')
   }
 
-  // company pills
+  // company pills: click to jump to that company's card
+  const cardEls = new Map<string, HTMLDetailsElement>()
   for (const name of names.slice(0, 4)) {
-    const pill = el('span', 'pill')
+    const pill = el('button', 'pill') as HTMLButtonElement
+    pill.setAttribute('aria-label', `Show details for ${name}`)
     pill.append(monogram('mono', name), name)
+    pill.addEventListener('click', () => {
+      const target = cardEls.get(name)
+      if (!target) return
+      ;($('details') as HTMLDetailsElement & { open: boolean }).open = true
+      target.open = true
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target.classList.add('flash')
+      setTimeout(() => target.classList.remove('flash'), 1200)
+    })
     $('who').append(pill)
   }
   if (names.length > 4) $('who').append(el('span', 'more', `+${names.length - 4} more`))
@@ -489,16 +502,36 @@ if (restricted) {
       subs.push('Only seen you here so far')
     }
     if (holder && holder.life > 86400 && !others) subs.push(`Left a cookie that lasts ${span(holder.life)}`)
-    list.append(
-      card({
-        name,
-        mono: name,
-        catText: [...g.cats].join(', '),
-        requests: g.total,
-        subs,
-        hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
-      }),
-    )
+
+    // expansion detail: which sites you met them on, and who they are
+    const detail: HTMLElement[] = []
+    const seenSites = Object.keys(ledger[rawOf.get(name) ?? name] ?? {})
+      .filter((d) => d !== siteDomain)
+      .slice(0, 5)
+    if (seenSites.length) detail.push(el('div', 'cdetail', `Also seen on ${seenSites.join(', ')}`))
+    const homepage = g.hosts.find((e) => e.tracker?.url)?.tracker?.url
+    if (homepage) {
+      const line = el('div', 'cdetail')
+      const a = document.createElement('a')
+      a.href = homepage
+      a.target = '_blank'
+      a.rel = 'noreferrer'
+      a.textContent = `About ${name} · ${new URL(homepage).hostname.replace(/^www\./, '')} ↗`
+      line.append(a)
+      detail.push(line)
+    }
+
+    const cardEl = card({
+      name,
+      mono: name,
+      catText: [...g.cats].join(', '),
+      requests: g.total,
+      subs,
+      detail,
+      hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
+    }) as HTMLDetailsElement
+    cardEls.set(name, cardEl)
+    list.append(cardEl)
   }
 
   // the site itself

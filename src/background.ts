@@ -1,7 +1,7 @@
 import { getDomain } from 'tldts'
 import trackerDb from './data/trackers.json'
 
-type Tracker = { company: string; category: string }
+type Tracker = { company: string; category: string; url?: string }
 type TabReport = {
   site: string
   siteCompany: string | null

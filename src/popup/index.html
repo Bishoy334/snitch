@@ -115,9 +115,12 @@
       .who:empty { display: none; }
       .pill {
         display: flex; align-items: center; gap: 6px;
-        background: var(--chipbg); border-radius: 99px;
+        background: var(--chipbg); border-radius: 99px; border: none;
+        color: var(--ink); cursor: pointer;
         padding: 3px 10px 3px 4px; font-size: 12px; font-weight: 550;
+        transition: background 0.15s ease;
       }
+      .pill:hover { background: color-mix(in srgb, var(--ink) 10%, var(--chipbg)); opacity: 1; }
       .mono {
         width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
         display: grid; place-items: center;
@@ -200,6 +203,10 @@
       .card .creq { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .card .hosts { padding: 0 0 4px; }
       .card .hosts .row { padding-left: 44px; color: var(--muted); font-size: 12px; }
+      .cdetail { color: var(--muted); font-size: 11.5px; padding: 3px 16px 3px 44px; }
+      .cdetail a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+      .cdetail a:hover { color: var(--ink); }
+      .card.flash > summary { background: color-mix(in srgb, var(--focus) 14%, transparent); }
 
       .fact { color: var(--muted); font-size: 12.5px; padding: 8px 16px 4px; }
       .fact.good { color: var(--ok); }

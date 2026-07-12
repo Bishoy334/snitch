@@ -5,13 +5,14 @@ const res = await fetch(
 )
 const data = (await res.json()) as { categories: Record<string, unknown[]> }
 
-const out: Record<string, { company: string; category: string }> = {}
+const out: Record<string, { company: string; category: string; url?: string }> = {}
 for (const [category, entries] of Object.entries(data.categories)) {
   for (const entry of entries) {
     for (const [company, info] of Object.entries(entry as Record<string, unknown>)) {
-      for (const domains of Object.values(info as Record<string, unknown>)) {
+      for (const [url, domains] of Object.entries(info as Record<string, unknown>)) {
         if (!Array.isArray(domains)) continue
-        for (const d of domains) if (typeof d === 'string') out[d] = { company, category }
+        const site = url.startsWith('http') ? url : undefined
+        for (const d of domains) if (typeof d === 'string') out[d] = { company, category, url: site }
       }
     }
   }
