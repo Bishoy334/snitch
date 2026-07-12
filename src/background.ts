@@ -32,6 +32,24 @@ function newReport(site: string): TabReport {
 
 chrome.action.setBadgeBackgroundColor({ color: '#c03535' })
 
+// cross-site ledger: which tracking companies appeared on which sites.
+// Local only (storage.local), entries expire after 30 days.
+const ledgerP: Promise<Record<string, Record<string, number>>> = chrome.storage.local
+  .get('ledger')
+  .then((r) => (r.ledger ?? {}) as Record<string, Record<string, number>>)
+
+async function recordSighting(company: string, site: string) {
+  const domain = getDomain(site)
+  if (!domain) return
+  const ledger = await ledgerP
+  const sites = (ledger[company] ??= {})
+  const t = Date.now()
+  if (sites[domain] && t - sites[domain] < 3600_000) return
+  sites[domain] = t
+  for (const [d, ts] of Object.entries(sites)) if (t - ts > 30 * 86400_000) delete sites[d]
+  chrome.storage.local.set({ ledger })
+}
+
 function save(tabId: number) {
   const report = reports.get(tabId)
   chrome.storage.session.set({ [`tab-${tabId}`]: report })
@@ -54,7 +72,12 @@ chrome.webRequest.onBeforeRequest.addListener(
     }
     const report = reports.get(tabId)
     if (!report || getDomain(host) === getDomain(report.site)) return
-    const entry = (report.requests[host] ??= { count: 0, tracker: lookupTracker(host) })
+    let entry = report.requests[host]
+    if (!entry) {
+      entry = report.requests[host] = { count: 0, tracker: lookupTracker(host) }
+      if (entry.tracker && entry.tracker.category !== 'Content' && entry.tracker.company !== report.siteCompany)
+        recordSighting(entry.tracker.company, report.site)
+    }
     entry.count++
     save(tabId)
   },

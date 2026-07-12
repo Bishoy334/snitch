@@ -417,7 +417,7 @@ if (restricted) {
 
   // the one action: wipe what this page (and its trackers) stored
   if (siteCookies.length || cookieHolders.length || (storage?.local ?? 0) > 0) {
-    const btn = el('button', '', 'Clear what this page left behind') as HTMLButtonElement
+    const btn = el('button', '', 'Forget this site') as HTMLButtonElement
     let cleared = false
     btn.addEventListener('click', async () => {
       if (cleared) {
@@ -437,7 +437,7 @@ if (restricted) {
       )
       cleared = true
       btn.disabled = false
-      btn.textContent = 'Cleared. Reload page'
+      btn.textContent = 'Forgotten. Reload page'
     })
     $('cta').append(btn)
   }
@@ -507,14 +507,15 @@ if (restricted) {
     domainInfo.set(d, info)
   }
 
+  const siteName = displayName(report.siteCompany ?? brand ?? report.site)
   const savedRows: HTMLElement[] = []
   for (const h of cookieHolders.slice(0, 5)) {
     const who = domainInfo.get(h.domain)?.company ?? h.domain
     const life = Math.max(0, ...h.cookies.map((c) => (c.expirationDate ?? now) - now))
     savedRows.push(
       savedRow(
-        `${who} tracking cookie${h.cookies.length > 1 ? 's' : ''}`,
-        `follows you across sites${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
+        `${who} can spot you on other sites`,
+        `its cookie here rides along wherever it runs${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
         'b',
       ),
     )
@@ -532,52 +533,61 @@ if (restricted) {
       ordinary++
     }
   }
-  if (lookalikes)
+  const idCount = lookalikes + (storage?.ids ?? 0)
+  if (idCount) {
+    const where = [
+      lookalikes ? `${lookalikes} cookie${lookalikes > 1 ? 's' : ''}` : '',
+      storage?.ids ? `${storage.ids} in local storage` : '',
+    ]
+      .filter(Boolean)
+      .join(', ')
     savedRows.push(
       savedRow(
-        lookalikes === 1 ? 'A cookie that looks like a unique ID' : `${lookalikes} cookies that look like unique IDs`,
-        'long-lived and random; probably identifies your browser',
+        `${siteName} can recognize you when you come back`,
+        `${idCount} saved identifier${idCount > 1 ? 's' : ''} (${where}), even if you log out`,
         'w',
       ),
     )
-  if (storage?.ids)
-    savedRows.push(
-      savedRow(`${storage.ids} unique ID${storage.ids > 1 ? 's' : ''} in local storage`, 'kept until you clear site data', 'w'),
-    )
+  }
   const boringStore = storage ? Math.max(0, storage.local - (storage.ids ?? 0)) : 0
   if (ordinary || boringStore) {
     const parts = []
-    if (ordinary) parts.push(`${ordinary} ordinary cookie${ordinary > 1 ? 's' : ''}`)
+    if (ordinary) parts.push(`${ordinary} cookie${ordinary > 1 ? 's' : ''}`)
     if (boringStore) parts.push(`${boringStore} storage item${boringStore > 1 ? 's' : ''}`)
-    savedRows.push(savedRow(parts.join(' · '), 'logins, settings, cache. The harmless kind.'))
+    savedRows.push(savedRow('The rest is housekeeping', `${parts.join(' and ')} for logins, settings, cache`))
   }
   if (savedRows.length) list.append(sec('Saved in your browser'), ...savedRows)
 
-  // 3. how you're followed across sites
-  const followCompanies = new Map<string, Set<string>>()
-  for (const h of cookieHolders) {
-    const info = domainInfo.get(h.domain)
-    if (!info) continue
-    const cats = followCompanies.get(info.company) ?? new Set<string>()
-    info.cats.forEach((c) => cats.add(c))
-    followCompanies.set(info.company, cats)
-  }
+  // 3. how you're followed across sites, answered from the local ledger:
+  // which of this page's trackers has this browser seen on other sites?
+  const ledger = ((await chrome.storage.local.get('ledger')).ledger ?? {}) as Record<
+    string,
+    Record<string, number>
+  >
+  const rawTotals = new Map<string, number>()
+  for (const e of tracking) rawTotals.set(e.tracker!.company, (rawTotals.get(e.tracker!.company) ?? 0) + e.count)
+  const hasIdCookie = new Set(cookieHolders.map((h) => domainInfo.get(h.domain)?.company).filter(Boolean))
   const follow: HTMLElement[] = []
-  for (const [company, cats] of [...followCompanies.entries()].slice(0, 3)) {
-    const where = cats.has('Advertising')
-      ? 'other sites that show its ads'
-      : cats.has('Social')
-        ? 'sites with its embedded buttons'
-        : 'other sites it measures'
+  for (const [raw] of [...rawTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)) {
+    const name = displayName(raw)
+    const others = Object.keys(ledger[raw] ?? {}).filter((d) => d !== siteDomain).length
     const f = el('div', 'fact')
-    f.append(bold(company), ` can link this visit to your activity on ${where}.`)
+    if (others) {
+      f.append(
+        bold(name),
+        ` has seen you on ${others} other site${others > 1 ? 's' : ''} recently`,
+        hasIdCookie.has(name) ? ', and holds an ID cookie that connects those visits.' : '.',
+      )
+    } else {
+      f.append(bold(name), ' has only seen you here so far. If it appears on other sites you visit, it can connect them.')
+    }
     follow.push(f)
   }
   if (fpKinds.length)
     follow.push(
       el('div', 'fact', "A fingerprint identifies your device without cookies. Clearing them won't stop it."),
     )
-  if (!follow.length) follow.push(el('div', 'fact good', 'No cross-site identifiers found on this page load.'))
+  if (!follow.length) follow.push(el('div', 'fact good', 'No one on this page tracks you across sites.'))
   list.append(sec('Following you across sites'))
   const wrap = el('div', 'facts')
   wrap.append(...follow)
