@@ -101,6 +101,30 @@ around it. A hostname never appears without a reason to care.
 10. Every element ships in both themes from the same tokens; no per-element
     dark-mode overrides.
 
+## F. Data-meaning layer (Level 2 stops being a technical list)
+
+The disclosure ("Where your data goes") answers three questions in order:
+
+1. Who got your visit — the company cards (unchanged).
+2. What's saved in your browser — cookies and storage classified by meaning,
+   never dumped:
+   - Known tracking cookies by name (small bundled dictionary: _ga, _fbp,
+     IDE, MUID, _ttp, ...) → "Google Analytics ID · lasts 2 years".
+   - Unknown long-lived cookies whose value looks like a unique ID
+     (length/charset/entropy heuristic) → counted, labeled "look like
+     unique IDs" — hedged, never asserted.
+   - Tracker-domain cookies → red, "follows you across sites".
+   - Local-storage values that look like IDs → counted.
+   - Everything boring collapses to one neutral line: "9 ordinary cookies
+     and 38 storage items (logins, settings)."
+3. How you're followed across sites — consequence sentences built from
+   findings: per company with ID cookies ("Google can link this visit to
+   your activity on other sites that show its ads"), fingerprinting ("works
+   even without cookies; clearing them won't stop it"), or an earned green
+   "No cross-site identifiers found."
+
+All classification is local (name dictionary + value heuristic). No lookups.
+
 ## D. Data nits while in there
 
 - Dedupe fingerprinting rows by kind+host in background (belt and braces).

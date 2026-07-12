@@ -59,6 +59,31 @@ const ICONS: Record<string, string> = {
   shield: '<path d="M8 1.8l5 1.9v4.1c0 3.4-2.1 5.4-5 6.4-2.9-1-5-3-5-6.4V3.7z"/><path d="M5.8 8l1.6 1.6 2.8-3"/>',
 }
 
+// famous tracking-cookie names -> plain meaning (prefix match, bundled, local)
+const KNOWN_COOKIES: [string, string][] = [
+  ['_ga', 'Google Analytics ID'],
+  ['_gid', 'Google Analytics session ID'],
+  ['_gcl_', 'Google ad-click ID'],
+  ['_fbp', 'Meta pixel ID'],
+  ['_fbc', 'Meta ad-click ID'],
+  ['IDE', 'Google ad ID'],
+  ['MUID', 'Microsoft ID'],
+  ['_uet', 'Microsoft Ads ID'],
+  ['_ttp', 'TikTok pixel ID'],
+  ['personalization_id', 'X (Twitter) ID'],
+  ['li_sugr', 'LinkedIn ID'],
+  ['ajs_anonymous_id', 'Segment ID'],
+  ['amplitude_id', 'Amplitude ID'],
+  ['_hj', 'Hotjar ID'],
+  ['_pin_unauth', 'Pinterest ID'],
+  ['_scid', 'Snapchat ID'],
+]
+
+// long, random-looking, no spaces: probably an identifier, said with a hedge
+function looksId(v: string): boolean {
+  return v.length >= 16 && v.length <= 200 && /^[\w.:%+/=-]+$/.test(v) && /\d/.test(v) && /[a-zA-Z]/.test(v)
+}
+
 const BRAND: Record<string, string> = {
   Google: '#4285f4',
   Meta: '#0866ff',
@@ -144,8 +169,20 @@ function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string) 
   $('story').append(item)
 }
 
-function makeRow(label: string, chipText: string, count?: number): HTMLElement {
+// two-line row for "saved in your browser": what it is, then what it means
+function savedRow(label: string, sub: string, dot?: 'b' | 'w'): HTMLElement {
+  const div = el('div', 'saved')
+  if (dot) div.append(el('span', `rdot rdot-${dot}`))
+  const txt = el('div', '')
+  txt.append(el('div', 'slabel', label))
+  if (sub) txt.append(el('div', 'ssub', sub))
+  div.append(txt)
+  return div
+}
+
+function makeRow(label: string, chipText: string, count?: number, dot?: 'b' | 'w'): HTMLElement {
   const div = el('div', 'row')
+  if (dot) div.append(el('span', `rdot rdot-${dot}`))
   div.append(el('span', 'host', label))
   if (chipText) div.append(el('span', 'chip', chipText))
   if (count !== undefined) div.append(el('span', 'count', String(count)))
@@ -255,7 +292,7 @@ if (restricted) {
         chrome.cookies.getAll({ domain: siteDomain }),
         chrome.tabs
           .sendMessage(tab.id!, { audit: true }, { frameId: 0 })
-          .catch(() => null) as Promise<{ local: number; session: number } | null>,
+          .catch(() => null) as Promise<{ local: number; session: number; ids?: number } | null>,
         ...trackedDomains.map((d) => chrome.cookies.getAll({ domain: d })),
       ])
     : [[] as chrome.cookies.Cookie[], null]
@@ -373,23 +410,13 @@ if (restricted) {
     story('g', 'shield', 'No device fingerprinting detected.')
   }
 
-  // Level 2: receipts
+  // Level 2: where your data goes
   $('details').hidden = false
   const list = $('list')
 
-  if (fp.length) {
-    list.append(sec('Fingerprinting', String(fp.length)))
-    for (const f of fp)
-      list.append(makeRow(FP_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : ''))
-  }
-  if (device.length) {
-    list.append(sec('Device access', String(device.length)))
-    for (const f of device)
-      list.append(makeRow(API_LABELS[f.kind] ?? f.kind, f.host && f.host !== report.site ? `by ${f.host}` : ''))
-  }
-
+  // 1. who got your visit
   if (companies.length) {
-    list.append(sec('Trackers', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
+    list.append(sec('Who got your visit', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
     for (const [name, g] of companies) {
       list.append(
         card({
@@ -419,7 +446,7 @@ if (restricted) {
     quietCards.push(
       card({
         name: 'Content delivery',
-        catText: 'fonts, scripts, media · not tracking',
+        catText: 'not tracking',
         requests: content.reduce((s, e) => s + e.count, 0),
         hosts: content.map((e) => ({
           label: e.tracker ? `${e.host} (${displayName(e.tracker.company)})` : e.host,
@@ -432,7 +459,7 @@ if (restricted) {
     quietCards.push(
       card({
         name: 'Unrecognized domains',
-        catText: 'not in the tracker database',
+        catText: 'not classified',
         requests: unknown.reduce((s, e) => s + e.count, 0),
         hosts: unknown.map((e) => ({ label: e.host, count: e.count })),
       }),
@@ -442,30 +469,91 @@ if (restricted) {
     list.append(sec('Everything else'), ...quietCards)
   }
 
-  // cookies & storage as sentences
-  const facts: HTMLElement[] = []
-  if (siteDomain && siteCookies.length) {
-    const persistent = siteCookies.filter((c) => c.expirationDate).length
-    const f = el('div', 'fact')
-    f.append(bold(siteDomain), ` set ${siteCookies.length} cookie${siteCookies.length > 1 ? 's' : ''}`)
-    if (persistent) f.append(`; ${persistent} stay${persistent === 1 ? 's' : ''} after you leave.`)
-    else f.append('; all expire when you close the tab.')
-    facts.push(f)
-  }
-  if (cookieHolders.length) {
-    const shown = cookieHolders.slice(0, 3).map((h) => `${h.domain} (${h.cookies.length})`)
-    const extra = cookieHolders.length > 3 ? ` and ${cookieHolders.length - 3} more` : ''
-    facts.push(el('div', 'fact', `Trackers holding cookies on you: ${shown.join(', ')}${extra}.`))
-  }
-  if (storage && (storage.local || storage.session)) {
-    facts.push(el('div', 'fact', `Local storage: ${storage.local} item${storage.local === 1 ? '' : 's'} · session storage: ${storage.session}.`))
-  }
-  if (facts.length) {
-    list.append(sec('Cookies & storage'))
-    const wrap = el('div', 'facts')
-    wrap.append(...facts)
-    list.append(wrap)
+  // 2. what's saved in your browser, by meaning
+  const domainInfo = new Map<string, { company: string; cats: Set<string> }>()
+  for (const e of tracking) {
+    const d = getDomain(e.host)
+    if (!d) continue
+    const info = domainInfo.get(d) ?? { company: displayName(e.tracker!.company), cats: new Set<string>() }
+    info.cats.add(e.tracker!.category)
+    domainInfo.set(d, info)
   }
 
-  if (!entries.length) list.append(el('div', 'empty', 'No third-party requests on this page.'))
+  const savedRows: HTMLElement[] = []
+  for (const h of cookieHolders.slice(0, 5)) {
+    const who = domainInfo.get(h.domain)?.company ?? h.domain
+    const life = Math.max(0, ...h.cookies.map((c) => (c.expirationDate ?? now) - now))
+    savedRows.push(
+      savedRow(
+        `${who} tracking cookie${h.cookies.length > 1 ? 's' : ''}`,
+        `follows you across sites${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
+        'b',
+      ),
+    )
+  }
+  let lookalikes = 0
+  let ordinary = 0
+  for (const c of siteCookies) {
+    const known = KNOWN_COOKIES.find(([prefix]) => c.name.startsWith(prefix))
+    const life = (c.expirationDate ?? now) - now
+    if (known && savedRows.length < 10) {
+      savedRows.push(savedRow(known[1], life > 86400 ? `cookie ${c.name} · lasts ${span(life)}` : `cookie ${c.name}`, 'w'))
+    } else if (!known && life > 30 * 86400 && looksId(c.value)) {
+      lookalikes++
+    } else if (!known) {
+      ordinary++
+    }
+  }
+  if (lookalikes)
+    savedRows.push(
+      savedRow(
+        lookalikes === 1 ? 'A cookie that looks like a unique ID' : `${lookalikes} cookies that look like unique IDs`,
+        'long-lived and random; probably identifies your browser',
+        'w',
+      ),
+    )
+  if (storage?.ids)
+    savedRows.push(
+      savedRow(`${storage.ids} unique ID${storage.ids > 1 ? 's' : ''} in local storage`, 'kept until you clear site data', 'w'),
+    )
+  const boringStore = storage ? Math.max(0, storage.local - (storage.ids ?? 0)) : 0
+  if (ordinary || boringStore) {
+    const parts = []
+    if (ordinary) parts.push(`${ordinary} ordinary cookie${ordinary > 1 ? 's' : ''}`)
+    if (boringStore) parts.push(`${boringStore} storage item${boringStore > 1 ? 's' : ''}`)
+    savedRows.push(savedRow(parts.join(' · '), 'logins, settings, cache. The harmless kind.'))
+  }
+  if (savedRows.length) list.append(sec('Saved in your browser'), ...savedRows)
+
+  // 3. how you're followed across sites
+  const followCompanies = new Map<string, Set<string>>()
+  for (const h of cookieHolders) {
+    const info = domainInfo.get(h.domain)
+    if (!info) continue
+    const cats = followCompanies.get(info.company) ?? new Set<string>()
+    info.cats.forEach((c) => cats.add(c))
+    followCompanies.set(info.company, cats)
+  }
+  const follow: HTMLElement[] = []
+  for (const [company, cats] of [...followCompanies.entries()].slice(0, 3)) {
+    const where = cats.has('Advertising')
+      ? 'other sites that show its ads'
+      : cats.has('Social')
+        ? 'sites with its embedded buttons'
+        : 'other sites it measures'
+    const f = el('div', 'fact')
+    f.append(bold(company), ` can link this visit to your activity on ${where}.`)
+    follow.push(f)
+  }
+  if (fpKinds.length)
+    follow.push(
+      el('div', 'fact', "A fingerprint identifies your device without cookies. Clearing them won't stop it."),
+    )
+  if (!follow.length) follow.push(el('div', 'fact good', 'No cross-site identifiers found on this page load.'))
+  list.append(sec('Following you across sites'))
+  const wrap = el('div', 'facts')
+  wrap.append(...follow)
+  list.append(wrap)
+
+  if (!entries.length && !siteCookies.length) list.append(el('div', 'empty', 'No third-party requests on this page.'))
 }
