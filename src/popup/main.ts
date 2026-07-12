@@ -186,16 +186,6 @@ function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string, 
   $('story').append(item)
 }
 
-// two-line row for "saved in your browser": what it is, then what it means
-function savedRow(label: string, sub: string): HTMLElement {
-  const div = el('div', 'saved')
-  const txt = el('div', '')
-  txt.append(el('div', 'slabel', label))
-  if (sub) txt.append(el('div', 'ssub', sub))
-  div.append(txt)
-  return div
-}
-
 function makeRow(label: string, chipText: string, count?: number): HTMLElement {
   const div = el('div', 'row')
   div.append(el('span', 'host', label))
@@ -204,25 +194,26 @@ function makeRow(label: string, chipText: string, count?: number): HTMLElement {
   return div
 }
 
-function sec(title: string, badge?: string): HTMLElement {
-  return el('div', 'sec', badge ? `${title} · ${badge}` : title)
-}
-
-// company card: header row, hostnames on expand
+// actor card: header + always-visible meaning lines, hostnames on expand
 function card(opts: {
   name: string
   mono?: string
   catText?: string
-  requests: number
+  requests?: number
+  subs?: string[]
   hosts: { label: string; count?: number }[]
 }): HTMLElement {
   const d = document.createElement('details')
   d.className = 'card'
   const s = document.createElement('summary')
-  if (opts.mono !== undefined) s.append(monogram('mono', opts.mono || opts.name))
-  s.append(el('span', 'cname', opts.name))
-  if (opts.catText) s.append(el('span', 'ccat', opts.catText))
-  s.append(el('span', 'creq', `${opts.requests} request${opts.requests === 1 ? '' : 's'}`))
+  const head = el('div', 'chead')
+  if (opts.mono !== undefined) head.append(monogram('mono', opts.mono || opts.name))
+  head.append(el('span', 'cname', opts.name))
+  if (opts.catText) head.append(el('span', 'ccat', opts.catText))
+  if (opts.requests !== undefined)
+    head.append(el('span', 'creq', `${opts.requests} request${opts.requests === 1 ? '' : 's'}`))
+  s.append(head)
+  for (const sub of opts.subs ?? []) s.append(el('div', 'csub', sub))
   d.append(s)
   const hosts = el('div', 'hosts')
   for (const h of opts.hosts) hosts.append(makeRow(h.label, '', h.count))
@@ -332,8 +323,10 @@ if (restricted) {
 
   // hero text
   const byCompany = new Map<string, { total: number; cats: Set<string>; hosts: Entry[] }>()
+  const rawOf = new Map<string, string>()
   for (const e of tracking) {
     const name = displayName(e.tracker!.company)
+    rawOf.set(name, e.tracker!.company)
     const g = byCompany.get(name) ?? { total: 0, cats: new Set<string>(), hosts: [] }
     g.total += e.count
     g.cats.add(niceCat(e.tracker!.category))
@@ -442,147 +435,99 @@ if (restricted) {
     $('cta').append(row)
   }
 
-  // Level 2: where your data goes
+  // Level 2: one card per actor, everything we know about each in one place
   $('details').hidden = false
   const list = $('list')
 
-  // 1. who got your visit
-  if (companies.length) {
-    list.append(sec('Who got your visit'))
-    for (const [name, g] of companies) {
-      list.append(
-        card({
-          name,
-          mono: name,
-          catText: [...g.cats].join(', '),
-          requests: g.total,
-          hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
-        }),
-      )
-    }
-  }
-
-  const quietCards: HTMLElement[] = []
-  if (own.length) {
-    quietCards.push(
-      card({
-        name: `${displayName(report.siteCompany ?? brand ?? report.site)}'s own services`,
-        catText: 'same owner',
-        requests: own.reduce((s, e) => s + e.count, 0),
-        hosts: own.map((e) => ({ label: e.host, count: e.count })),
-      }),
-    )
-  }
-  if (content.length) {
-    quietCards.push(
-      card({
-        name: 'Content delivery',
-        catText: 'not tracking',
-        requests: content.reduce((s, e) => s + e.count, 0),
-        hosts: content.map((e) => ({
-          label: e.tracker ? `${e.host} (${displayName(e.tracker.company)})` : e.host,
-          count: e.count,
-        })),
-      }),
-    )
-  }
-  if (unknown.length) {
-    quietCards.push(
-      card({
-        name: 'Unrecognized domains',
-        catText: 'not classified',
-        requests: unknown.reduce((s, e) => s + e.count, 0),
-        hosts: unknown.map((e) => ({ label: e.host, count: e.count })),
-      }),
-    )
-  }
-  // 2. what's saved in your browser, by meaning
-  const domainInfo = new Map<string, { company: string; cats: Set<string> }>()
-  for (const e of tracking) {
-    const d = getDomain(e.host)
-    if (!d) continue
-    const info = domainInfo.get(d) ?? { company: displayName(e.tracker!.company), cats: new Set<string>() }
-    info.cats.add(e.tracker!.category)
-    domainInfo.set(d, info)
-  }
-
-  const siteName = displayName(report.siteCompany ?? brand ?? report.site)
-  const savedRows: HTMLElement[] = []
-  for (const h of cookieHolders.slice(0, 5)) {
-    const who = domainInfo.get(h.domain)?.company ?? h.domain
-    const life = Math.max(0, ...h.cookies.map((c) => (c.expirationDate ?? now) - now))
-    savedRows.push(
-      savedRow(
-        `${who} can spot you on other sites`,
-        `its cookie travels with you${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
-      ),
-    )
-  }
-  let lookalikes = 0
-  let ordinary = 0
-  for (const c of siteCookies) {
-    const known = KNOWN_COOKIES.find(([prefix]) => c.name.startsWith(prefix))
-    const life = (c.expirationDate ?? now) - now
-    if (known && savedRows.length < 10) {
-      savedRows.push(savedRow(known[1], life > 86400 ? `cookie ${c.name} · lasts ${span(life)}` : `cookie ${c.name}`))
-    } else if (!known && life > 30 * 86400 && looksId(c.value)) {
-      lookalikes++
-    } else if (!known) {
-      ordinary++
-    }
-  }
-  const idCount = lookalikes + (storage?.ids ?? 0)
-  if (idCount) {
-    savedRows.push(
-      savedRow(
-        `${siteName} can recognize you when you come back`,
-        `${idCount} saved identifier${idCount > 1 ? 's' : ''}`,
-      ),
-    )
-  }
-  const boringStore = storage ? Math.max(0, storage.local - (storage.ids ?? 0)) : 0
-  if (ordinary || boringStore) {
-    const parts = []
-    if (ordinary) parts.push(`${ordinary} cookie${ordinary > 1 ? 's' : ''}`)
-    if (boringStore) parts.push(`${boringStore} storage item${boringStore > 1 ? 's' : ''}`)
-    savedRows.push(makeRow(parts.join(' · '), 'housekeeping'))
-  }
-  if (savedRows.length) list.append(sec('Saved in your browser'), ...savedRows)
-
-  // 3. how you're followed across sites, answered from the local ledger:
-  // which of this page's trackers has this browser seen on other sites?
   const ledger = ((await chrome.storage.local.get('ledger')).ledger ?? {}) as Record<
     string,
     Record<string, number>
   >
-  const rawTotals = new Map<string, number>()
-  for (const e of tracking) rawTotals.set(e.tracker!.company, (rawTotals.get(e.tracker!.company) ?? 0) + e.count)
-  const hasIdCookie = new Set(cookieHolders.map((h) => domainInfo.get(h.domain)?.company).filter(Boolean))
-  const follow: HTMLElement[] = []
-  for (const [raw] of [...rawTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)) {
-    const name = displayName(raw)
-    const others = Object.keys(ledger[raw] ?? {}).filter((d) => d !== siteDomain).length
-    const f = el('div', 'fact')
+  const holderCompany = new Map<string, { domain: string; life: number }>()
+  for (const h of cookieHolders) {
+    const e = tracking.find((t) => getDomain(t.host) === h.domain)
+    if (!e) continue
+    const name = displayName(e.tracker!.company)
+    if (holderCompany.has(name)) continue
+    holderCompany.set(name, {
+      domain: h.domain,
+      life: Math.max(0, ...h.cookies.map((c) => (c.expirationDate ?? now) - now)),
+    })
+  }
+
+  if (!companies.length) list.append(el('div', 'fact good', 'No one on this page tracks you across sites.'))
+
+  for (const [name, g] of companies) {
+    const others = Object.keys(ledger[rawOf.get(name) ?? name] ?? {}).filter((d) => d !== siteDomain).length
+    const holder = holderCompany.get(name)
+    const subs: string[] = []
     if (others) {
-      f.append(
-        bold(name),
-        ` has seen you on ${others} other site${others > 1 ? 's' : ''} recently`,
-        hasIdCookie.has(name) ? '. An ID cookie connects them.' : '.',
+      subs.push(
+        `Seen you on ${others} other site${others > 1 ? 's' : ''} recently${holder ? ' · its cookie connects them' : ''}`,
       )
     } else {
-      f.append(bold(name), ' has only seen you here so far.')
+      subs.push('Only seen you here so far')
     }
-    follow.push(f)
+    if (holder && holder.life > 86400 && !others) subs.push(`Left a cookie that lasts ${span(holder.life)}`)
+    list.append(
+      card({
+        name,
+        mono: name,
+        catText: [...g.cats].join(', '),
+        requests: g.total,
+        subs,
+        hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
+      }),
+    )
   }
-  if (!follow.length) follow.push(el('div', 'fact good', 'No one on this page tracks you across sites.'))
-  list.append(sec('Following you across sites'))
-  const wrap = el('div', 'facts')
-  wrap.append(...follow)
-  list.append(wrap)
 
-  // leftovers last: meaning above, inventory below
-  if (quietCards.length) {
-    list.append(sec('Everything else'), ...quietCards)
+  // the site itself
+  const siteName = displayName(report.siteCompany ?? brand ?? report.site)
+  let lookalikes = 0
+  let ordinary = 0
+  const knownNames: string[] = []
+  for (const c of siteCookies) {
+    const known = KNOWN_COOKIES.find(([prefix]) => c.name.startsWith(prefix))
+    const life = (c.expirationDate ?? now) - now
+    if (known) knownNames.push(known[1])
+    else if (life > 30 * 86400 && looksId(c.value)) lookalikes++
+    else ordinary++
+  }
+  const idCount = lookalikes + (storage?.ids ?? 0)
+  const boringStore = storage ? Math.max(0, storage.local - (storage.ids ?? 0)) : 0
+  const siteSubs: string[] = []
+  if (idCount) siteSubs.push(`Can recognize you when you return · ${idCount} saved identifier${idCount > 1 ? 's' : ''}`)
+  if (knownNames.length) siteSubs.push(`Includes a ${[...new Set(knownNames)].slice(0, 2).join(' and a ')}`)
+  if (ordinary || boringStore) siteSubs.push(`${ordinary} cookies · ${boringStore} storage items · housekeeping`)
+  const ownTotal = own.reduce((s, e) => s + e.count, 0)
+  if (siteSubs.length || own.length) {
+    list.append(
+      card({
+        name: `${siteName} · this site`,
+        mono: siteName,
+        requests: ownTotal || undefined,
+        subs: siteSubs,
+        hosts: own.map((e) => ({ label: e.host, count: e.count })),
+      }),
+    )
+  }
+
+  // everything that is neither tracking nor the site
+  const rest = [...content, ...unknown]
+  if (rest.length) {
+    list.append(
+      card({
+        name: 'Everything else',
+        catText: 'fonts, CDNs, embeds',
+        requests: rest.reduce((s, e) => s + e.count, 0),
+        hosts: rest
+          .sort((a, b) => b.count - a.count)
+          .map((e) => ({
+            label: e.tracker ? `${e.host} (${displayName(e.tracker.company)})` : e.host,
+            count: e.count,
+          })),
+      }),
+    )
   }
 
   if (!entries.length && !siteCookies.length) list.append(el('div', 'empty', 'No third-party requests on this page.'))

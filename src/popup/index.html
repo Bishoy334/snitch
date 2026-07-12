@@ -38,7 +38,7 @@
         width: 360px; margin: 0;
         user-select: none;
       }
-      .verdict, .story, .list, .facts { user-select: text; }
+      .verdict, .story, .list { user-select: text; }
       :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
       ::selection { background: color-mix(in srgb, var(--focus) 28%, transparent); }
 
@@ -168,11 +168,6 @@
 
       .list { padding-bottom: 8px; }
 
-      .sec {
-        padding: 10px 16px 4px;
-        font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-        color: var(--muted);
-      }
       .row {
         display: flex; align-items: baseline; gap: 7px;
         padding: 5px 16px; border-radius: 4px;
@@ -183,8 +178,10 @@
       .chip { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 4; }
       .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
 
-      /* company cards */
-      .card > summary { padding: 6px 16px; gap: 8px; }
+      /* actor cards */
+      .card > summary { display: block; padding: 7px 16px; }
+      .card .chead { display: flex; align-items: center; gap: 8px; }
+      .card .csub { color: var(--muted); font-size: 11.5px; margin: 1px 0 0 28px; }
       .card .cname { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .card .cname { flex-shrink: 0; max-width: 55%; }
       .card .ccat { font-size: 11px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 4px; overflow: hidden; flex-shrink: 4; }
@@ -192,14 +189,8 @@
       .card .hosts { padding: 0 0 4px; }
       .card .hosts .row { padding-left: 44px; color: var(--muted); font-size: 12px; }
 
-      .facts { padding: 0 16px 6px; display: grid; gap: 4px; }
-      .fact { color: var(--muted); font-size: 12.5px; }
-      .fact b { color: var(--ink); font-weight: 600; }
+      .fact { color: var(--muted); font-size: 12.5px; padding: 8px 16px 4px; }
       .fact.good { color: var(--ok); }
-      .saved { display: flex; gap: 8px; padding: 4px 16px; align-items: flex-start; border-radius: 4px; transition: background 0.15s ease; }
-      .saved:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-      .saved .slabel { font-weight: 600; font-size: 12.5px; }
-      .saved .ssub { color: var(--muted); font-size: 11.5px; }
 
       .empty { padding: 6px 16px 16px; color: var(--muted); }
     </style>
