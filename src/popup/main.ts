@@ -1,4 +1,4 @@
-import { getDomain } from 'tldts'
+import { getDomain, getDomainWithoutSuffix } from 'tldts'
 
 type Tracker = { company: string; category: string }
 type Entry = { host: string; count: number; tracker: Tracker | null }
@@ -268,12 +268,17 @@ if (restricted) {
     .map(([host, r]) => ({ host, ...r }))
     .sort((a, b) => b.count - a.count)
 
-  const tracking = entries.filter(
-    (e) => e.tracker && e.tracker.category !== 'Content' && e.tracker.company !== report.siteCompany,
+  // same brand on another TLD (dailymail.com -> dailymail.co.uk) is the site itself
+  const brand = getDomainWithoutSuffix(report.site)
+  const sameBrand = (host: string) => !!brand && getDomainWithoutSuffix(host) === brand
+  const own = entries.filter(
+    (e) => (e.tracker && e.tracker.company === report.siteCompany) || sameBrand(e.host),
   )
-  const own = entries.filter((e) => e.tracker && e.tracker.company === report.siteCompany)
+  const tracking = entries.filter(
+    (e) => e.tracker && e.tracker.category !== 'Content' && !own.includes(e),
+  )
   const content = entries.filter((e) => e.tracker?.category === 'Content' && !own.includes(e))
-  const unknown = entries.filter((e) => !e.tracker)
+  const unknown = entries.filter((e) => !e.tracker && !own.includes(e))
 
   const signals = report.fingerprinting ?? []
   const seen = new Set<string>()
@@ -432,10 +437,10 @@ if (restricted) {
   }
 
   const quietCards: HTMLElement[] = []
-  if (own.length && report.siteCompany) {
+  if (own.length) {
     quietCards.push(
       card({
-        name: `${displayName(report.siteCompany)}'s own services`,
+        name: `${displayName(report.siteCompany ?? brand ?? report.site)}'s own services`,
         catText: 'same owner as this site',
         requests: own.reduce((s, e) => s + e.count, 0),
         hosts: own.map((e) => ({ label: e.host, count: e.count })),
