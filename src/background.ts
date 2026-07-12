@@ -61,13 +61,37 @@ function save(tabId: number) {
   chrome.action.setBadgeText({ tabId, text: trackers ? String(Math.min(trackers, 99)) : '' })
 }
 
+// "forget this site when I close it": wipe a flagged site's data once its
+// last tab is gone (closed or navigated away)
+async function maybeForget(site: string) {
+  const domain = getDomain(site)
+  if (!domain) return
+  const forget = ((await chrome.storage.local.get('forget')).forget ?? {}) as Record<string, boolean>
+  if (!forget[domain]) return
+  const tabs = await chrome.tabs.query({})
+  const stillOpen = tabs.some((t) => {
+    try {
+      return getDomain(new URL(t.url ?? '').hostname) === domain
+    } catch {
+      return false
+    }
+  })
+  if (stillOpen) return
+  chrome.browsingData.remove(
+    { origins: [`https://${domain}`, `https://www.${domain}`] },
+    { cookies: true, localStorage: true, indexedDB: true, cacheStorage: true },
+  )
+}
+
 chrome.webRequest.onBeforeRequest.addListener(
   ({ tabId, url, type }) => {
     if (tabId < 0) return
     const host = new URL(url).hostname
     if (type === 'main_frame') {
+      const prev = reports.get(tabId)
       reports.set(tabId, newReport(host))
       save(tabId)
+      if (prev && getDomain(prev.site) !== getDomain(host)) setTimeout(() => maybeForget(prev.site), 500)
       return
     }
     const report = reports.get(tabId)
@@ -105,6 +129,8 @@ chrome.runtime.onMessage.addListener((msg: { fp?: string; host?: string }, sende
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  const site = reports.get(tabId)?.site
   reports.delete(tabId)
   chrome.storage.session.remove(`tab-${tabId}`)
+  if (site) setTimeout(() => maybeForget(site), 500)
 })

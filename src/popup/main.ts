@@ -187,9 +187,8 @@ function story(sev: 'b' | 'w' | 'g', icon: string, head: string, note?: string, 
 }
 
 // two-line row for "saved in your browser": what it is, then what it means
-function savedRow(label: string, sub: string, dot?: 'b' | 'w'): HTMLElement {
+function savedRow(label: string, sub: string): HTMLElement {
   const div = el('div', 'saved')
-  if (dot) div.append(el('span', `rdot rdot-${dot}`))
   const txt = el('div', '')
   txt.append(el('div', 'slabel', label))
   if (sub) txt.append(el('div', 'ssub', sub))
@@ -197,9 +196,8 @@ function savedRow(label: string, sub: string, dot?: 'b' | 'w'): HTMLElement {
   return div
 }
 
-function makeRow(label: string, chipText: string, count?: number, dot?: 'b' | 'w'): HTMLElement {
+function makeRow(label: string, chipText: string, count?: number): HTMLElement {
   const div = el('div', 'row')
-  if (dot) div.append(el('span', `rdot rdot-${dot}`))
   div.append(el('span', 'host', label))
   if (chipText) div.append(el('span', 'chip', chipText))
   if (count !== undefined) div.append(el('span', 'count', String(count)))
@@ -215,7 +213,6 @@ function card(opts: {
   name: string
   mono?: string
   catText?: string
-  redDot?: boolean
   requests: number
   hosts: { label: string; count?: number }[]
 }): HTMLElement {
@@ -224,11 +221,7 @@ function card(opts: {
   const s = document.createElement('summary')
   if (opts.mono !== undefined) s.append(monogram('mono', opts.mono || opts.name))
   s.append(el('span', 'cname', opts.name))
-  if (opts.catText) {
-    const cat = el('span', 'ccat')
-    cat.append(el('span', `dot${opts.redDot ? '' : ' neutral'}`), opts.catText)
-    s.append(cat)
-  }
+  if (opts.catText) s.append(el('span', 'ccat', opts.catText))
   s.append(el('span', 'creq', `${opts.requests} request${opts.requests === 1 ? '' : 's'}`))
   d.append(s)
   const hosts = el('div', 'hosts')
@@ -433,31 +426,20 @@ if (restricted) {
     story('g', 'shield', 'No device fingerprinting detected.')
   }
 
-  // the one action: wipe what this page (and its trackers) stored
-  if (siteCookies.length || cookieHolders.length || (storage?.local ?? 0) > 0) {
-    const btn = el('button', '', 'Forget this site') as HTMLButtonElement
-    let cleared = false
-    btn.addEventListener('click', async () => {
-      if (cleared) {
-        chrome.tabs.reload(tab.id!)
-        window.close()
-        return
-      }
-      btn.disabled = true
-      btn.textContent = 'Clearing…'
-      const origins: [string, ...string[]] = [
-        new URL(tabUrl).origin,
-        ...cookieHolders.map((h) => `https://${h.domain}`),
-      ]
-      await chrome.browsingData.remove(
-        { origins },
-        { cookies: true, localStorage: true, indexedDB: true, cacheStorage: true },
-      )
-      cleared = true
-      btn.disabled = false
-      btn.textContent = 'Forgotten. Reload page'
+  // the one control: wipe this site's data whenever you leave it
+  if (siteDomain) {
+    const forget = ((await chrome.storage.local.get('forget')).forget ?? {}) as Record<string, boolean>
+    const row = el('label', 'switchrow')
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.checked = !!forget[siteDomain]
+    input.addEventListener('change', () => {
+      if (input.checked) forget[siteDomain] = true
+      else delete forget[siteDomain]
+      chrome.storage.local.set({ forget })
     })
-    $('cta').append(btn)
+    row.append(input, el('span', '', 'Forget this site when I close it'))
+    $('cta').append(row)
   }
 
   // Level 2: where your data goes
@@ -466,14 +448,13 @@ if (restricted) {
 
   // 1. who got your visit
   if (companies.length) {
-    list.append(sec('Who got your visit', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
+    list.append(sec('Who got your visit'))
     for (const [name, g] of companies) {
       list.append(
         card({
           name,
           mono: name,
           catText: [...g.cats].join(', '),
-          redDot: true,
           requests: g.total,
           hosts: g.hosts.map((e) => ({ label: e.host, count: e.count })),
         }),
@@ -534,7 +515,6 @@ if (restricted) {
       savedRow(
         `${who} can spot you on other sites`,
         `its cookie travels with you${life > 86400 ? ` · lasts ${span(life)}` : ''}`,
-        'b',
       ),
     )
   }
@@ -544,7 +524,7 @@ if (restricted) {
     const known = KNOWN_COOKIES.find(([prefix]) => c.name.startsWith(prefix))
     const life = (c.expirationDate ?? now) - now
     if (known && savedRows.length < 10) {
-      savedRows.push(savedRow(known[1], life > 86400 ? `cookie ${c.name} · lasts ${span(life)}` : `cookie ${c.name}`, 'w'))
+      savedRows.push(savedRow(known[1], life > 86400 ? `cookie ${c.name} · lasts ${span(life)}` : `cookie ${c.name}`))
     } else if (!known && life > 30 * 86400 && looksId(c.value)) {
       lookalikes++
     } else if (!known) {
@@ -556,8 +536,7 @@ if (restricted) {
     savedRows.push(
       savedRow(
         `${siteName} can recognize you when you come back`,
-        `${idCount} saved identifier${idCount > 1 ? 's' : ''} · still there if you log out`,
-        'w',
+        `${idCount} saved identifier${idCount > 1 ? 's' : ''}`,
       ),
     )
   }
@@ -566,7 +545,7 @@ if (restricted) {
     const parts = []
     if (ordinary) parts.push(`${ordinary} cookie${ordinary > 1 ? 's' : ''}`)
     if (boringStore) parts.push(`${boringStore} storage item${boringStore > 1 ? 's' : ''}`)
-    savedRows.push(savedRow('The rest is housekeeping', parts.join(' · ')))
+    savedRows.push(makeRow(parts.join(' · '), 'housekeeping'))
   }
   if (savedRows.length) list.append(sec('Saved in your browser'), ...savedRows)
 
