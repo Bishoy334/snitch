@@ -27,10 +27,15 @@
         }
       }
       * { box-sizing: border-box; }
+      /* single scroller: the popup body itself; the list never nests its own */
+      html { scrollbar-width: thin; scrollbar-color: var(--hair) transparent; }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 99px; border: 2px solid var(--bg); }
       body {
         font: 13px/1.5 system-ui, sans-serif;
         background: var(--bg); color: var(--ink);
-        width: 360px; margin: 0; max-height: 600px;
+        width: 360px; margin: 0;
         user-select: none;
       }
       .verdict, .story, .list, .facts { user-select: text; }
@@ -131,10 +136,7 @@
       }
       details.main[open] > summary::after { transform: rotate(180deg); }
 
-      .list { max-height: 300px; overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--hair) transparent; }
-      .list::-webkit-scrollbar { width: 8px; }
-      .list::-webkit-scrollbar-track { background: transparent; }
-      .list::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 99px; border: 2px solid var(--bg); }
+      .list { padding-bottom: 8px; }
 
       .sec {
         padding: 10px 16px 4px;

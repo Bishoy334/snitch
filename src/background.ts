@@ -30,8 +30,18 @@ function newReport(site: string): TabReport {
   return { site, siteCompany: lookupTracker(site)?.company ?? null, requests: {}, fingerprinting: [] }
 }
 
+chrome.action.setBadgeBackgroundColor({ color: '#cf4141' })
+chrome.action.setBadgeTextColor({ color: '#ffffff' })
+
 function save(tabId: number) {
-  chrome.storage.session.set({ [`tab-${tabId}`]: reports.get(tabId) })
+  const report = reports.get(tabId)
+  chrome.storage.session.set({ [`tab-${tabId}`]: report })
+  const trackers = report
+    ? Object.values(report.requests).filter(
+        (r) => r.tracker && r.tracker.category !== 'Content' && r.tracker.company !== report.siteCompany,
+      ).length
+    : 0
+  chrome.action.setBadgeText({ tabId, text: trackers ? String(trackers) : '' })
 }
 
 chrome.webRequest.onBeforeRequest.addListener(

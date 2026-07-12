@@ -57,7 +57,14 @@ const ICONS: Record<string, string> = {
   cookie: '<circle cx="8" cy="8" r="5.8"/><circle cx="6" cy="6.3" r="0.4"/><circle cx="9.6" cy="5.9" r="0.4"/><circle cx="10" cy="9.6" r="0.4"/><circle cx="6.4" cy="9.9" r="0.4"/>',
   radar: '<circle cx="8" cy="9.8" r="1.5"/><path d="M4.8 6.6a4.6 4.6 0 0 1 6.4 0"/><path d="M2.8 4.4a7.4 7.4 0 0 1 10.4 0"/>',
   shield: '<path d="M8 1.8l5 1.9v4.1c0 3.4-2.1 5.4-5 6.4-2.9-1-5-3-5-6.4V3.7z"/><path d="M5.8 8l1.6 1.6 2.8-3"/>',
+  link: '<path d="M6.5 9.5l3-3"/><path d="M7.5 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1"/><path d="M8.5 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/>',
 }
+
+// URL parameters that carry a per-click ad identifier (not mere utm labels)
+const CLICK_IDS = new Set([
+  'fbclid', 'gclid', 'dclid', 'wbraid', 'gbraid', 'msclkid',
+  'ttclid', 'twclid', 'yclid', 'li_fat_id', 'mc_eid', 'igshid',
+])
 
 // famous tracking-cookie names -> plain meaning (prefix match, bundled, local)
 const KNOWN_COOKIES: [string, string][] = [
@@ -391,6 +398,16 @@ if (restricted) {
   if (asked.length) story('b', 'radar', `Asked for ${joinHuman(asked.map((k) => API_PHRASES[k]))}.`)
   if (device.some((d) => d.kind === 'clipboard')) story('b', 'radar', 'Read your clipboard.')
 
+  const clickIds = tabHost ? [...new URL(tabUrl).searchParams.keys()].filter((p) => CLICK_IDS.has(p)) : []
+  if (clickIds.length) {
+    story(
+      'w',
+      'link',
+      'This link carried an ad click ID.',
+      `The ${clickIds[0]} tag in the address ties this visit to the ad or post you came from.`,
+    )
+  }
+
   if (cookieHolders.length && longestLife > 86400) {
     const head =
       cookieHolders.length === 1
@@ -410,15 +427,16 @@ if (restricted) {
     story('g', 'shield', 'No device fingerprinting detected.')
   }
 
-  // Level 2: where your data goes
+  // Level 2: where your data goes. Personal-data sections lead; the company
+  // inventory collects into a fragment appended last.
   $('details').hidden = false
   const list = $('list')
+  const whoFrag = document.createDocumentFragment()
 
-  // 1. who got your visit
   if (companies.length) {
-    list.append(sec('Who got your visit', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
+    whoFrag.append(sec('Who got your visit', `${companies.length} compan${companies.length > 1 ? 'ies' : 'y'}`))
     for (const [name, g] of companies) {
-      list.append(
+      whoFrag.append(
         card({
           name,
           mono: name,
@@ -466,7 +484,7 @@ if (restricted) {
     )
   }
   if (quietCards.length) {
-    list.append(sec('Everything else'), ...quietCards)
+    whoFrag.append(sec('Everything else'), ...quietCards)
   }
 
   // 2. what's saved in your browser, by meaning
@@ -554,6 +572,8 @@ if (restricted) {
   const wrap = el('div', 'facts')
   wrap.append(...follow)
   list.append(wrap)
+
+  list.append(whoFrag)
 
   if (!entries.length && !siteCookies.length) list.append(el('div', 'empty', 'No third-party requests on this page.'))
 }
